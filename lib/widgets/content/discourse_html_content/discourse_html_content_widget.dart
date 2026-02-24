@@ -24,6 +24,7 @@ import 'builders/iframe_builder.dart';
 import 'builders/image_grid_builder.dart';
 import 'builders/combined_decorator_overlay.dart';
 import 'builders/mention_builder.dart';
+import 'builders/scan_boundary.dart';
 import 'image_utils.dart';
 
 /// Discourse HTML 内容渲染 Widget
@@ -411,20 +412,24 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
     // 内联代码：通过扫描方案渲染背景
 
     // HTML 构建器：用于嵌套渲染
+    // 用 ScanBoundary 包裹，阻止外层 overlay 扫描进入嵌套内容
+    // 每个 DiscourseHtmlContent 自带独立的 CombinedDecoratorOverlay
     Widget htmlBuilder(String html, TextStyle? textStyle) {
-      return DiscourseHtmlContent(
-        html: html,
-        compact: true,
-        textStyle: textStyle,
-        galleryImages: _galleryInfo.images,
-        onInternalLinkTap: widget.onInternalLinkTap,
-        post: widget.post,
-        topicId: widget.topicId,
-        linkCounts: widget.linkCounts,
-        mentionedUsers: widget.mentionedUsers,
-        enableSelectionArea: widget.enableSelectionArea,
-        enablePanguSpacing: widget.enablePanguSpacing,
-        screenshotMode: widget.screenshotMode,
+      return ScanBoundary(
+        child: DiscourseHtmlContent(
+          html: html,
+          compact: true,
+          textStyle: textStyle,
+          galleryImages: _galleryInfo.images,
+          onInternalLinkTap: widget.onInternalLinkTap,
+          post: widget.post,
+          topicId: widget.topicId,
+          linkCounts: widget.linkCounts,
+          mentionedUsers: widget.mentionedUsers,
+          enableSelectionArea: widget.enableSelectionArea,
+          enablePanguSpacing: widget.enablePanguSpacing,
+          screenshotMode: widget.screenshotMode,
+        ),
       );
     }
 
