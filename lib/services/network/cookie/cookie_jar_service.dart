@@ -146,10 +146,14 @@ class CookieJarService {
         io.Cookie cookie;
         try {
           cookie = io.Cookie(wc.name, wc.value)
-            ..path = wc.path ?? '/';
+            ..path = wc.path ?? '/'
+            ..secure = wc.isSecure ?? false
+            ..httpOnly = wc.isHttpOnly ?? false;
         } catch (_) {
           cookie = io.Cookie(wc.name, CookieValueCodec.encode(wc.value))
-            ..path = wc.path ?? '/';
+            ..path = wc.path ?? '/'
+            ..secure = wc.isSecure ?? false
+            ..httpOnly = wc.isHttpOnly ?? false;
         }
 
         if (domainAttr != null) {
@@ -188,18 +192,22 @@ class CookieJarService {
       final uri = Uri.parse(AppConstants.baseUrl);
       final cookies = await _cookieJar!.loadForRequest(uri);
 
-      // 先清除 WebView 中该 URL 的所有 cookie，避免遗留旧 cookie 导致重复
-      await _webViewCookieManager.deleteCookies(url: WebUri(AppConstants.baseUrl));
-      debugPrint('[CookieJar] Cleared WebView cookies before sync');
+      // 先获取 WebView 中现有的 cookie，然后逐个按 domain 精确删除。
+      final existingCookies = await _webViewCookieManager.getCookies(
+        url: WebUri(AppConstants.baseUrl),
+      );
+      for (final wc in existingCookies) {
+        await _webViewCookieManager.deleteCookie(
+          url: WebUri(AppConstants.baseUrl),
+          name: wc.name,
+          domain: wc.domain,
+          path: wc.path ?? '/',
+        );
+      }
+      debugPrint('[CookieJar] Cleared ${existingCookies.length} WebView cookies before sync');
 
       if (cookies.isEmpty) {
         debugPrint('[CookieJar] No cookies to sync to WebView');
-        if (CfChallengeLogger.isEnabled) {
-          CfChallengeLogger.logCookieSync(
-            direction: 'CookieJar -> WebView',
-            cookies: [],
-          );
-        }
         return;
       }
 
@@ -219,11 +227,17 @@ class CookieJarService {
       }
 
       for (final cookie in cookies) {
+        final decodedValue = CookieValueCodec.decode(cookie.value);
+        final value = decodedValue.isEmpty ? ' ' : decodedValue;
+        // domain 为 null（host-only cookie）时，使用 baseUrl 的 host 作为默认值，
+        // 否则 setCookie 会因缺少 domain 而静默失败
+        final domain = cookie.domain ?? uri.host;
+
         await _webViewCookieManager.setCookie(
           url: WebUri(AppConstants.baseUrl),
           name: cookie.name,
-          value: CookieValueCodec.decode(cookie.value),
-          domain: cookie.domain,
+          value: value,
+          domain: domain,
           path: cookie.path ?? '/',
           isSecure: cookie.secure,
           isHttpOnly: cookie.httpOnly,
