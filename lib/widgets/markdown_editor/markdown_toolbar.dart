@@ -761,6 +761,11 @@ class MarkdownToolbarState extends State<MarkdownToolbar> {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
+                        _ToolbarButton(
+                          icon: FontAwesomeIcons.image,
+                          onPressed: _isUploading ? null : _pickAndUploadImage,
+                          isLoading: _isUploading,
+                        ),
                         // 标题按钮（带弹出菜单）
                         PopupMenuButton<int>(
                           icon: FaIcon(
@@ -821,11 +826,6 @@ class MarkdownToolbarState extends State<MarkdownToolbar> {
                         _ToolbarButton(
                           icon: FontAwesomeIcons.fileCode,
                           onPressed: insertCodeBlock,
-                        ),
-                        _ToolbarButton(
-                          icon: FontAwesomeIcons.image,
-                          onPressed: _isUploading ? null : _pickAndUploadImage,
-                          isLoading: _isUploading,
                         ),
                         _ToolbarButton(
                           icon: FontAwesomeIcons.tableColumns,
