@@ -26,6 +26,8 @@ import 'metaverse_page.dart';
 import 'drafts_page.dart';
 import '../widgets/ldc_balance_card.dart';
 import '../providers/ldc_providers.dart';
+import '../widgets/cdk_balance_card.dart';
+import '../providers/cdk_providers.dart';
 import '../utils/number_utils.dart';
 import '../services/emoji_handler.dart';
 import '../constants.dart';
@@ -270,6 +272,19 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 return Column(
                   children: const [
                     LdcBalanceCard(compact: true),
+                    SizedBox(height: 24),
+                  ],
+                );
+              },
+            ),
+
+            Consumer(
+              builder: (context, ref, _) {
+                final cdkUserInfo = ref.watch(cdkUserInfoProvider).value;
+                if (cdkUserInfo == null) return const SizedBox.shrink();
+                return Column(
+                  children: const [
+                    CdkBalanceCard(compact: true),
                     SizedBox(height: 24),
                   ],
                 );

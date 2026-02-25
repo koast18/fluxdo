@@ -9,6 +9,7 @@ import 'category_provider.dart';
 import 'message_bus/notification_providers.dart';
 import 'message_bus/topic_tracking_providers.dart';
 import 'ldc_providers.dart';
+import 'cdk_providers.dart';
 
 class AppStateRefresher {
   AppStateRefresher._();
@@ -30,6 +31,7 @@ class AppStateRefresher {
     }
     ref.read(activeCategorySlugsProvider.notifier).reset();
     await ref.read(ldcUserInfoProvider.notifier).disable();
+    await ref.read(cdkUserInfoProvider.notifier).disable();
   }
 
   static final List<void Function(WidgetRef ref)> _refreshers = [
@@ -56,6 +58,7 @@ class AppStateRefresher {
     (ref) => ref.invalidate(latestChannelProvider),
     (ref) => ref.invalidate(messageBusInitProvider),
     (ref) => ref.invalidate(ldcUserInfoProvider),
+    (ref) => ref.invalidate(cdkUserInfoProvider),
     (ref) {
       final pinnedIds = ref.read(pinnedCategoriesProvider);
       for (final sort in TopicListFilter.values) {

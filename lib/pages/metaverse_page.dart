@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/ldc_oauth_service.dart';
+import '../services/cdk_oauth_service.dart';
 import '../services/toast_service.dart';
 import '../providers/ldc_providers.dart';
+import '../providers/cdk_providers.dart';
 import '../widgets/ldc_balance_card.dart';
+import '../widgets/cdk_balance_card.dart';
 
 class MetaversePage extends ConsumerStatefulWidget {
   const MetaversePage({super.key});
@@ -15,9 +18,12 @@ class MetaversePage extends ConsumerStatefulWidget {
 
 class _MetaversePageState extends ConsumerState<MetaversePage> {
   static const String _ldcEnabledKey = 'ldc_enabled';
+  static const String _cdkEnabledKey = 'cdk_enabled';
   bool _ldcEnabled = false;
+  bool _cdkEnabled = false;
   bool _isLoading = true;
-  bool _isProcessing = false;
+  bool _ldcProcessing = false;
+  bool _cdkProcessing = false;
 
   @override
   void initState() {
@@ -29,13 +35,14 @@ class _MetaversePageState extends ConsumerState<MetaversePage> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _ldcEnabled = prefs.getBool(_ldcEnabledKey) ?? false;
+      _cdkEnabled = prefs.getBool(_cdkEnabledKey) ?? false;
       _isLoading = false;
     });
   }
 
   Future<void> _toggleLdc(bool value) async {
-    if (_isProcessing) return;
-    setState(() => _isProcessing = true);
+    if (_ldcProcessing) return;
+    setState(() => _ldcProcessing = true);
     try {
       if (value) {
         await _enableLdc();
@@ -44,7 +51,7 @@ class _MetaversePageState extends ConsumerState<MetaversePage> {
       }
     } finally {
       if (mounted) {
-        setState(() => _isProcessing = false);
+        setState(() => _ldcProcessing = false);
       }
     }
   }
@@ -83,6 +90,56 @@ class _MetaversePageState extends ConsumerState<MetaversePage> {
     ref.read(ldcUserInfoProvider.notifier).clear();
   }
 
+  Future<void> _toggleCdk(bool value) async {
+    if (_cdkProcessing) return;
+    setState(() => _cdkProcessing = true);
+    try {
+      if (value) {
+        await _enableCdk();
+      } else {
+        await _disableCdk();
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _cdkProcessing = false);
+      }
+    }
+  }
+
+  Future<void> _enableCdk() async {
+    try {
+      final service = CdkOAuthService();
+      final result = await service.authorize(context);
+
+      if (result && mounted) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(_cdkEnabledKey, true);
+        setState(() => _cdkEnabled = true);
+        ref.read(cdkUserInfoProvider.notifier).refresh();
+        if (mounted) {
+          ToastService.showSuccess('CDK 授权成功');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastService.showError('授权失败: $e');
+      }
+    }
+  }
+
+  Future<void> _disableCdk() async {
+    try {
+      final service = CdkOAuthService();
+      await service.logout();
+    } catch (e) {
+      // 忽略登出错误
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_cdkEnabledKey, false);
+    setState(() => _cdkEnabled = false);
+    ref.read(cdkUserInfoProvider.notifier).clear();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -116,6 +173,9 @@ class _MetaversePageState extends ConsumerState<MetaversePage> {
                         // LDC 服务卡片
                         _buildLdcServiceItem(theme),
                         const SizedBox(height: 16),
+                        // CDK 服务卡片
+                        _buildCdkServiceItem(theme),
+                        const SizedBox(height: 16),
                         // 更多服务占位符
                         _buildComingSoonItem(theme),
                         const SizedBox(height: 100), // 底部留白
@@ -130,47 +190,8 @@ class _MetaversePageState extends ConsumerState<MetaversePage> {
 
   Widget _buildLdcServiceItem(ThemeData theme) {
     if (_ldcEnabled) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const LdcBalanceCard(),
-          const SizedBox(height: 12),
-           // 简单的设置入口，不再占据大面积
-          Card(
-            elevation: 0,
-            color: theme.colorScheme.surfaceContainerLow,
-            margin: EdgeInsets.zero,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2)),
-            ),
-            child: ListTile(
-              onTap: _isProcessing ? null : () => _toggleLdc(false),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.settings_suggest_rounded,
-                  color: theme.colorScheme.onSecondaryContainer,
-                  size: 20,
-                ),
-              ),
-              title: const Text('LDC 服务已开启'),
-              subtitle: const Text('点击关闭服务'),
-              trailing: _isProcessing
-                  ? SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.primary),
-                    )
-                  : Icon(Icons.check_circle_rounded, color: theme.colorScheme.primary),
-            ),
-          ),
-        ],
+      return LdcBalanceCard(
+        onDisable: _ldcProcessing ? null : () => _toggleLdc(false),
       );
     }
 
@@ -184,7 +205,7 @@ class _MetaversePageState extends ConsumerState<MetaversePage> {
         side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2)),
       ),
       child: InkWell(
-        onTap: _isProcessing ? null : () => _toggleLdc(true),
+        onTap: _ldcProcessing ? null : () => _toggleLdc(true),
         borderRadius: BorderRadius.circular(24),
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -225,7 +246,7 @@ class _MetaversePageState extends ConsumerState<MetaversePage> {
                 ),
               ),
               const SizedBox(width: 8),
-              if (_isProcessing)
+              if (_ldcProcessing)
                 const SizedBox(
                   width: 24,
                   height: 24,
@@ -234,6 +255,86 @@ class _MetaversePageState extends ConsumerState<MetaversePage> {
               else
                 FilledButton(
                   onPressed: () => _toggleLdc(true),
+                   style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: const Text('开启'),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCdkServiceItem(ThemeData theme) {
+    if (_cdkEnabled) {
+      return CdkBalanceCard(
+        onDisable: _cdkProcessing ? null : () => _toggleCdk(false),
+      );
+    }
+
+    // 未开启状态：展示连接卡片
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerHigh,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2)),
+      ),
+      child: InkWell(
+        onTap: _cdkProcessing ? null : () => _toggleCdk(true),
+        borderRadius: BorderRadius.circular(24),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.tertiaryContainer,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  Icons.token_rounded,
+                  size: 32,
+                  color: theme.colorScheme.onTertiaryContainer,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'CDK 服务',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '连接账户，开启 CDK 权益',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (_cdkProcessing)
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                FilledButton(
+                  onPressed: () => _toggleCdk(true),
                    style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     visualDensity: VisualDensity.compact,
