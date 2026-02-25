@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:cookie_jar/cookie_jar.dart';
@@ -140,7 +139,17 @@ class AppCookieManager extends Interceptor {
         .map((str) => str.split(_setCookieReg))
         .expand((cookie) => cookie)
         .where((cookie) => cookie.isNotEmpty)
-        .map((str) => Cookie.fromSetCookieValue(str))
+        .map((str) {
+          final cookie = Cookie.fromSetCookieValue(str);
+          // Dart SDK 解析 Set-Cookie 时不对 Domain 属性做规范化，
+          // 但 RFC 6265 §5.2.3 规定 Domain=linux.do 等价于 Domain=.linux.do，
+          // 都是域级 cookie（匹配自身及所有子域）。
+          // 补上前导点以对齐 WKWebView 的 HTTPCookie 行为。
+          if (cookie.domain != null && !cookie.domain!.startsWith('.')) {
+            cookie.domain = '.${cookie.domain}';
+          }
+          return cookie;
+        })
         .toList();
 
     // Save cookies for the original site.

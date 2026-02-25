@@ -26,7 +26,7 @@ class CdkBalanceCard extends ConsumerWidget {
       return GestureDetector(
         onTap: () => WebViewPage.open(
           context,
-          'https://cdk.linux.do/home',
+          'https://cdk.linux.do',
           title: 'LINUX DO CDK',
         ),
         child: Card(
@@ -82,7 +82,7 @@ class CdkBalanceCard extends ConsumerWidget {
     return GestureDetector(
       onTap: () => WebViewPage.open(
         context,
-        'https://cdk.linux.do/home',
+        'https://cdk.linux.do',
         title: 'LINUX DO CDK',
       ),
       child: Card(
