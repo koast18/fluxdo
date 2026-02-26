@@ -2,10 +2,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/message_bus_service.dart';
-import '../../services/local_notification_service.dart';
 import '../discourse_providers.dart';
 import 'message_bus_service_provider.dart';
-import 'notification_providers.dart';
 
 /// 话题追踪状态元数据 Provider（MessageBus 频道初始 message ID）
 final topicTrackingStateMetaProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
@@ -44,87 +42,23 @@ class MessageBusInitNotifier extends Notifier<void> {
       return;
     }
     
-    // 准备批量订阅数据
-    final subscriptions = <String, ({int messageId, MessageBusCallback callback})>{};
-    
-    // 1. 添加通知频道
-    final notificationChannel = '/notification/${currentUser.id}';
-    final notificationMessageId = currentUser.notificationChannelPosition;
-    
-    void onNotification(MessageBusMessage message) {
-      final data = message.data;
-      if (data is Map<String, dynamic>) {
-        final allUnreadCount = data['all_unread_notifications_count'] as int?;
-        final unreadCount = data['unread_notifications'] as int?;
-        final unreadHighPriority = data['unread_high_priority_notifications'] as int?;
-        
-        debugPrint('[Notification] 收到 MessageBus 推送: allUnread=$allUnreadCount, unread=$unreadCount, highPriority=$unreadHighPriority');
-        
-        if (allUnreadCount != null || unreadCount != null || unreadHighPriority != null) {
-          ref.read(notificationCountStateProvider.notifier).update(
-            allUnread: allUnreadCount,
-            unread: unreadCount,
-            highPriority: unreadHighPriority,
-          );
-        }
-      }
-      ref.invalidate(notificationListProvider);
-    }
-    
-    subscriptions[notificationChannel] = (messageId: notificationMessageId, callback: onNotification);
-    _allCallbacks[notificationChannel] = onNotification;
-    
-    // 2. 添加通知提醒频道（用于系统通知，复刻 Discourse 官方实现）
-    final notificationAlertChannel = '/notification-alert/${currentUser.id}';
-    
-    void onNotificationAlert(MessageBusMessage message) {
-      final data = message.data;
-      debugPrint('[NotificationAlert] 收到提醒: $data');
-
-      if (data is Map<String, dynamic>) {
-        // Discourse payload 格式:
-        // notification_type, topic_title, topic_id, post_number, excerpt, username, post_url
-        final topicTitle = data['topic_title'] as String? ?? '';
-        final topicId = data['topic_id'] as int?;
-        final postNumber = data['post_number'] as int?;
-        final excerpt = data['excerpt'] as String? ?? '';
-        final username = data['username'] as String? ?? '';
-
-        String title = topicTitle.isNotEmpty ? topicTitle : '新通知';
-        String body = excerpt.isNotEmpty ? excerpt : username;
-
-        debugPrint('[NotificationAlert] 发送系统通知: title=$title, body=$body, topicId=$topicId, postNumber=$postNumber');
-
-        LocalNotificationService().show(
-          title: title,
-          body: body,
-          id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
-          topicId: topicId,
-          postNumber: postNumber,
-        );
-      }
-    }
-    
-    subscriptions[notificationAlertChannel] = (messageId: -1, callback: onNotificationAlert);
-    _allCallbacks[notificationAlertChannel] = onNotificationAlert;
-    
-    // 3. 添加话题追踪频道
+    // 逐个订阅话题追踪频道
+    // 注意: /notification/ 和 /notification-alert/ 频道由专门的
+    // NotificationChannelNotifier 和 NotificationAlertChannelNotifier 管理，
+    // 此处只负责话题追踪频道
+    debugPrint('[MessageBusInit] 订阅 ${meta.length} 个频道: ${meta.keys}');
     for (final entry in meta.entries) {
       final channel = entry.key;
       final messageId = entry.value as int;
-      
+
       void onTopicTracking(MessageBusMessage message) {
         debugPrint('[TopicTracking] 收到消息: ${message.channel} #${message.messageId}');
         // TODO: 根据频道类型更新对应的话题列表
       }
-      
-      subscriptions[channel] = (messageId: messageId, callback: onTopicTracking);
+
       _allCallbacks[channel] = onTopicTracking;
+      messageBus.subscribeWithMessageId(channel, onTopicTracking, messageId);
     }
-    
-    // 4. 批量订阅所有频道（只发起一次轮询）
-    debugPrint('[MessageBusInit] 批量订阅 ${subscriptions.length} 个频道: ${subscriptions.keys}');
-    messageBus.subscribeMultiple(subscriptions);
     
     ref.onDispose(() {
       debugPrint('[MessageBusInit] 取消所有订阅: ${_allCallbacks.keys}');

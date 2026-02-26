@@ -55,10 +55,8 @@ class MessageBusService {
   
   bool _isPolling = false;
   bool _shouldStop = false;
-  bool _shouldRestart = false; // 标记是否需要重启轮询
   bool _backgroundMode = false; // 后台模式：只轮询通知频道
   CancelToken? _currentCancelToken; // 当前请求的 CancelToken
-  Timer? _reconnectTimer;
   int _failureCount = 0;
   static const int _maxBackoffSeconds = 30;
 
@@ -80,8 +78,6 @@ class MessageBusService {
 
   /// 订阅频道
   void subscribe(String channel, MessageBusCallback callback, {int lastMessageId = -1}) {
-    final isNewChannel = !_subscriptions.containsKey(channel);
-    
     if (!_subscriptions.containsKey(channel)) {
       _subscriptions[channel] = _ChannelSubscription(
         channel: channel,
@@ -89,13 +85,12 @@ class MessageBusService {
       );
     }
     _subscriptions[channel]!.callbacks.add(callback);
-    
-    // 如果是新频道且正在轮询，重启轮询
-    if (isNewChannel && _isPolling) {
-      debugPrint('[MessageBus] 新频道加入: $channel，重启轮询');
-      _restartPolling();
-    } else if (!_isPolling) {
+
+    if (!_isPolling) {
       _startPolling();
+    } else {
+      // 中止当前请求，轮询循环会自然重启并包含新频道
+      _currentCancelToken?.cancel();
     }
   }
 
@@ -120,11 +115,8 @@ class MessageBusService {
 
   /// 使用指定的 messageId 订阅
   void subscribeWithMessageId(String channel, MessageBusCallback callback, int messageId) {
-    final isNewChannel = !_subscriptions.containsKey(channel);
-    
     if (_subscriptions.containsKey(channel)) {
       _subscriptions[channel]!.callbacks.add(callback);
-      // 更新 messageId（使用较大的值）
       if (messageId > _subscriptions[channel]!.lastMessageId) {
         _subscriptions[channel]!.lastMessageId = messageId;
       }
@@ -135,42 +127,12 @@ class MessageBusService {
         callbacks: [callback],
       );
     }
-    
-    // 如果是新频道且正在轮询，重启轮询
-    if (isNewChannel && _isPolling) {
-      debugPrint('[MessageBus] 新频道加入: $channel，重启轮询');
-      _restartPolling();
-    } else if (!_isPolling && _subscriptions.isNotEmpty) {
+
+    if (!_isPolling) {
       _startPolling();
-    }
-  }
-  
-  /// 批量订阅多个频道（避免多次启动轮询）
-  /// [subscriptions] 格式: {'/latest': {messageId: 123, callback: fn}, ...}
-  void subscribeMultiple(Map<String, ({int messageId, MessageBusCallback callback})> subscriptions) {
-    for (final entry in subscriptions.entries) {
-      final channel = entry.key;
-      final messageId = entry.value.messageId;
-      final callback = entry.value.callback;
-      
-      if (_subscriptions.containsKey(channel)) {
-        _subscriptions[channel]!.callbacks.add(callback);
-        if (messageId > _subscriptions[channel]!.lastMessageId) {
-          _subscriptions[channel]!.lastMessageId = messageId;
-        }
-      } else {
-        _subscriptions[channel] = _ChannelSubscription(
-          channel: channel,
-          lastMessageId: messageId,
-          callbacks: [callback],
-        );
-      }
-    }
-    
-    // 所有订阅添加完成后，统一启动轮询
-    if (!_isPolling && _subscriptions.isNotEmpty) {
-      debugPrint('[MessageBus] 批量订阅完成，启动轮询: ${_subscriptions.keys}');
-      _startPolling();
+    } else {
+      // 中止当前请求，轮询循环会自然重启并包含新频道
+      _currentCancelToken?.cancel();
     }
   }
 
@@ -189,25 +151,13 @@ class MessageBusService {
     _isPolling = false;
     _currentCancelToken?.cancel('[MessageBus] 停止轮询');
     _currentCancelToken = null;
-    _reconnectTimer?.cancel();
-    _reconnectTimer = null;
-  }
-  
-  /// 重启轮询（取消当前请求并重新开始）
-  void _restartPolling() {
-    if (!_isPolling) return;
-    
-    debugPrint('[MessageBus] 取消当前请求，准备重启');
-    _shouldRestart = true;
-    _currentCancelToken?.cancel('[MessageBus] 重启轮询');
   }
 
   /// 执行长轮询（流式处理）
   Future<void> _poll() async {
     while (!_shouldStop && _subscriptions.isNotEmpty) {
-      _shouldRestart = false;
       _currentCancelToken = CancelToken();
-      
+
       try {
         final payload = <String, String>{};
         for (final sub in _subscriptions.values) {
@@ -223,9 +173,9 @@ class MessageBusService {
           await Future.delayed(const Duration(seconds: 5));
           continue;
         }
-        
+
         debugPrint('[MessageBus] 发起轮询: $payload');
-        
+
         // 使用流式响应 + CancelToken
         final response = await _dio.post<ResponseBody>(
           '/message-bus/$_clientId/poll',
@@ -237,59 +187,49 @@ class MessageBusService {
             extra: {'isSilent': true},
           ),
         );
-        
+
         _failureCount = 0;
-        _currentCancelToken = null;
-        
+
         // 流式处理响应
         String buffer = '';
         await for (final chunk in response.data!.stream) {
-          // 检查是否需要重启
-          if (_shouldRestart) {
-            debugPrint('[MessageBus] 检测到重启信号，中断当前响应处理');
+          if (_currentCancelToken?.isCancelled ?? false) {
+            debugPrint('[MessageBus] 检测到取消信号，中断当前响应处理');
             break;
           }
-          
+
           final text = utf8.decode(chunk);
           buffer += text;
-          
+
           // 按 | 分割处理每个完整的消息块
           while (buffer.contains('|')) {
             final delimiterIndex = buffer.indexOf('|');
             final messageChunk = buffer.substring(0, delimiterIndex).trim();
             buffer = buffer.substring(delimiterIndex + 1);
-            
+
             if (messageChunk.isNotEmpty) {
               _processChunk(messageChunk);
             }
           }
         }
-        
+
         // 处理剩余的数据
-        if (!_shouldRestart && buffer.trim().isNotEmpty) {
+        if (!(_currentCancelToken?.isCancelled ?? false) && buffer.trim().isNotEmpty) {
           _processChunk(buffer.trim());
         }
-        
-        // 如果是因为重启而中断，立即继续下一次轮询
-        if (_shouldRestart) {
-          debugPrint('[MessageBus] 重启轮询');
-          continue;
-        }
-        
+
       } on DioException catch (e) {
         _currentCancelToken = null;
-        
-        // 如果是取消请求（重启轮询），直接继续
+
         if (e.type == DioExceptionType.cancel) {
-          if (_shouldRestart) {
-            debugPrint('[MessageBus] 请求已取消，重启轮询');
-            continue;
-          } else {
+          if (_shouldStop) {
             debugPrint('[MessageBus] 请求已取消，停止轮询');
             break;
           }
+          debugPrint('[MessageBus] 请求已取消，重新轮询');
+          continue;
         }
-        
+
         // 处理速率限制（429 Too Many Requests）
         if (e.response?.statusCode == 429) {
           final retryAfter = int.tryParse(
@@ -312,7 +252,7 @@ class MessageBusService {
         final backoffSeconds = min(pow(2, _failureCount).toInt(), _maxBackoffSeconds);
         debugPrint('[MessageBus] 轮询失败: ${e.type}, ${e.message}');
         debugPrint('[MessageBus] $backoffSeconds秒后重试');
-        
+
         await Future.delayed(Duration(seconds: backoffSeconds));
       } catch (e, stack) {
         _failureCount++;
@@ -323,7 +263,7 @@ class MessageBusService {
         await Future.delayed(Duration(seconds: backoffSeconds));
       }
     }
-    
+
     _isPolling = false;
   }
   
@@ -394,7 +334,7 @@ class MessageBusService {
     _backgroundMode = true;
     debugPrint('[MessageBus] 进入后台模式，只保留通知频道');
     if (_isPolling) {
-      _restartPolling();
+      _currentCancelToken?.cancel();
     }
   }
 
@@ -405,7 +345,7 @@ class MessageBusService {
     debugPrint('[MessageBus] 退出后台模式，恢复所有频道');
     _failureCount = 0;
     if (_isPolling) {
-      _restartPolling();
+      _currentCancelToken?.cancel();
     } else if (_subscriptions.isNotEmpty) {
       _startPolling();
     }

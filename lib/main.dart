@@ -210,6 +210,8 @@ class _MainPageState extends ConsumerState<MainPage> with WidgetsBindingObserver
   ProviderSubscription<AsyncValue<void>>? _authStateSub;
   ProviderSubscription<AsyncValue<User?>>? _currentUserSub;
   ProviderSubscription<void>? _messageBusSub;
+  ProviderSubscription<void>? _notificationChannelSub;
+  ProviderSubscription<void>? _notificationAlertChannelSub;
   bool _messageBusInitialized = false;
   int? _lastTappedIndex;
   DateTime? _lastTapTime;
@@ -258,11 +260,19 @@ class _MainPageState extends ConsumerState<MainPage> with WidgetsBindingObserver
             if (!mounted) return;
             _messageBusSub?.close();
             _messageBusSub = ref.listenManual<void>(messageBusInitProvider, (_, _) {});
+            _notificationChannelSub?.close();
+            _notificationChannelSub = ref.listenManual<void>(notificationChannelProvider, (_, _) {});
+            _notificationAlertChannelSub?.close();
+            _notificationAlertChannelSub = ref.listenManual<void>(notificationAlertChannelProvider, (_, _) {});
           });
         } else if (user == null) {
           _messageBusInitialized = false;
           _messageBusSub?.close();
           _messageBusSub = null;
+          _notificationChannelSub?.close();
+          _notificationChannelSub = null;
+          _notificationAlertChannelSub?.close();
+          _notificationAlertChannelSub = null;
         }
       },
       fireImmediately: true,
@@ -308,6 +318,8 @@ class _MainPageState extends ConsumerState<MainPage> with WidgetsBindingObserver
     _authStateSub?.close();
     _currentUserSub?.close();
     _messageBusSub?.close();
+    _notificationChannelSub?.close();
+    _notificationAlertChannelSub?.close();
     super.dispose();
   }
 

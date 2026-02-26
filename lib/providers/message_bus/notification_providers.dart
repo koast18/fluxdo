@@ -116,7 +116,11 @@ class NotificationChannelNotifier extends Notifier<void> {
               debugPrint('[Notification] 解析新通知失败: $e');
               ref.invalidate(notificationListProvider);
             }
+          } else {
+            ref.invalidate(notificationListProvider);
           }
+        } else {
+          ref.invalidate(notificationListProvider);
         }
       }
     }
