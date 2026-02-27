@@ -180,6 +180,36 @@ class DiscourseNotification {
     return template.replaceAll('{size}', size.toString());
   }
 
+  DiscourseNotification copyWith({
+    int? id,
+    int? userId,
+    NotificationType? notificationType,
+    bool? read,
+    bool? highPriority,
+    DateTime? createdAt,
+    int? postNumber,
+    int? topicId,
+    String? slug,
+    NotificationData? data,
+    String? fancyTitle,
+    String? actingUserAvatarTemplate,
+  }) {
+    return DiscourseNotification(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      notificationType: notificationType ?? this.notificationType,
+      read: read ?? this.read,
+      highPriority: highPriority ?? this.highPriority,
+      createdAt: createdAt ?? this.createdAt,
+      postNumber: postNumber ?? this.postNumber,
+      topicId: topicId ?? this.topicId,
+      slug: slug ?? this.slug,
+      data: data ?? this.data,
+      fancyTitle: fancyTitle ?? this.fancyTitle,
+      actingUserAvatarTemplate: actingUserAvatarTemplate ?? this.actingUserAvatarTemplate,
+    );
+  }
+
   /// 获取通知标题
   String get title {
     final displayName = data.displayUsername ?? data.originalUsername ?? '';

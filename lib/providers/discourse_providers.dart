@@ -19,6 +19,9 @@ export 'category_provider.dart';
 // 通知列表相关
 export 'notification_list_provider.dart';
 
+// 最近通知（快捷面板）
+export 'recent_notifications_provider.dart';
+
 // 用户内容相关 (浏览历史、书签、我的话题)
 export 'user_content_providers.dart';
 

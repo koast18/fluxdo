@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/discourse_providers.dart';
-import '../../pages/notifications_page.dart';
+import '../notification/notification_quick_panel.dart';
 
 class NotificationIconButton extends ConsumerWidget {
   const NotificationIconButton({super.key});
@@ -11,10 +11,7 @@ class NotificationIconButton extends ConsumerWidget {
     final unreadCount = ref.watch(unreadNotificationCountProvider);
     return IconButton(
       onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const NotificationsPage()),
-        );
+        NotificationQuickPanel.show(context);
       },
       icon: Badge(
         isLabelVisible: unreadCount > 0,

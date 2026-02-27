@@ -2,17 +2,15 @@ part of 'discourse_service.dart';
 
 /// 通知相关
 mixin _NotificationsMixin on _DiscourseServiceBase {
-  /// 触发 bump_last_seen_notification，清除通知计数
-  /// 使用 recent 模式让服务端自动更新 seen_notification_id
-  Future<void> bumpSeenNotification() async {
-    await _dio.get(
-      '/notifications',
-      queryParameters: {
-        'recent': true,
-        'limit': 1,
-        'bump_last_seen_reviewable': true,
-      },
-    );
+  /// 获取最近通知（recent 模式，非分页，用于快捷面板）
+  /// 同时触发 bump_last_seen_reviewable 清除通知计数
+  Future<NotificationListResponse> getRecentNotifications() async {
+    final response = await _dio.get('/notifications', queryParameters: {
+      'recent': true,
+      'limit': 30,
+      'bump_last_seen_reviewable': true,
+    });
+    return NotificationListResponse.fromJson(response.data);
   }
 
   /// 获取通知列表（默认模式，支持完整分页）
