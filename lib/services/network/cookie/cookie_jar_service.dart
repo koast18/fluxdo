@@ -264,11 +264,11 @@ class CookieJarService {
       }
 
       // 清除 WebView 中现有的 cookie
-      // 使用 deleteCookies（批量）保证 Android 上能正确清除 domain cookie；
-      // 再逐个 deleteCookie 精确清除子域 cookie（Apple 需要）。
+      // 1. deleteCookies（批量）清除 host-only cookie（domain 匹配 url host）
       await _webViewCookieManager.deleteCookies(url: WebUri(AppConstants.baseUrl));
+      // 2. 逐个 deleteCookie 精确清除 domain cookie（带前导点的无法被批量删除匹配到）
+      //    以及子域 cookie
       for (final host in relatedHosts) {
-        if (host == uri.host) continue; // 主域已通过 deleteCookies 清除
         final url = 'https://$host';
         final existing = await _webViewCookieManager.getCookies(url: WebUri(url));
         for (final wc in existing) {
@@ -309,14 +309,17 @@ class CookieJarService {
         final value = CookieValueCodec.decode(cookie.value);
         final String? domain;
         if (isApple) {
-          // Apple: 确保 domain 非 null 且有前导点
+          // Apple: domain 必须非 null 且带前导点，否则 setCookie 静默失败
+          // （flutter_inappwebview #338，b272dbf）。
           if (cookie.domain != null) {
             domain = cookie.domain!.startsWith('.') ? cookie.domain : '.${cookie.domain}';
           } else {
-            domain = sourceHost;
+            domain = '.$sourceHost';
           }
         } else {
-          // Android: 保持原值
+          // Android: 保持原值（与 0.1.28 一致），
+          // host-only cookie 保持 null，syncFromWebView 读回时存入 hostCookies，
+          // 不会覆盖 Dio saveCookies 存入 domainCookies 中的有效副本。
           domain = cookie.domain;
         }
         final cookieUrl = 'https://${domain != null && domain.startsWith('.') ? domain.substring(1) : (domain ?? sourceHost)}';
