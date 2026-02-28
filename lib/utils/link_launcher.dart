@@ -11,6 +11,7 @@ import '../pages/user_profile_page.dart';
 import '../pages/webview_page.dart';
 import '../providers/preferences_provider.dart';
 import '../widgets/common/external_link_confirm_dialog.dart';
+import 'discourse_url_parser.dart';
 import 'link_security.dart';
 import 'url_helper.dart';
 
@@ -108,26 +109,19 @@ Future<void> launchContentLink(
   if (url.isEmpty) return;
 
   // 1. 识别用户链接 /u/username
-  final userMatch = RegExp(r'/u/([^/?#]+)').firstMatch(url);
-  if (userMatch != null && isInternalUrlString(url)) {
-    final username = userMatch.group(1)!;
+  final userInfo = DiscourseUrlParser.parseUser(url);
+  if (userInfo != null && isInternalUrlString(url)) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => UserProfilePage(username: username)),
+      MaterialPageRoute(builder: (_) => UserProfilePage(username: userInfo.username)),
     );
     return;
   }
 
-  // 2. 解析话题链接 /t/topic/123
-  final topicMatch = RegExp(r'/t/(?:[^/]+/)?(\d+)(?:/(\d+))?').firstMatch(url);
-  if (topicMatch != null && isInternalUrlString(url)) {
+  // 2. 解析话题链接
+  final topicInfo = DiscourseUrlParser.parseTopic(url);
+  if (topicInfo != null && isInternalUrlString(url)) {
     if (onInternalLinkTap != null) {
-      final topicId = int.parse(topicMatch.group(1)!);
-      final postNumber = int.tryParse(topicMatch.group(2) ?? '');
-      final slugMatch = RegExp(r'/t/([^/]+)/\d+').firstMatch(url);
-      final slug = (slugMatch != null && slugMatch.group(1) != 'topic')
-          ? slugMatch.group(1)
-          : null;
-      onInternalLinkTap(topicId, slug, postNumber);
+      onInternalLinkTap(topicInfo.topicId, topicInfo.slug, topicInfo.postNumber);
       return;
     }
     // 没有回调时用 WebView 打开

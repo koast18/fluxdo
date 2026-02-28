@@ -4,6 +4,7 @@ import 'package:html/dom.dart' as dom;
 import '../../../../constants.dart';
 import '../../../../pages/user_profile_page.dart';
 import '../../../../services/discourse_cache_manager.dart';
+import '../../../../utils/discourse_url_parser.dart';
 
 /// 构建用户提及链接
 Widget? buildMention({
@@ -38,12 +39,11 @@ Widget? buildMention({
     child: GestureDetector(
       onTap: href != null
           ? () {
-              final userMatch = RegExp(r'/u/([^/?#]+)').firstMatch(href);
-              if (userMatch != null) {
-                final username = userMatch.group(1)!;
+              final userInfo = DiscourseUrlParser.parseUser(href);
+              if (userInfo != null) {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                      builder: (_) => UserProfilePage(username: username)),
+                      builder: (_) => UserProfilePage(username: userInfo.username)),
                 );
               }
             }

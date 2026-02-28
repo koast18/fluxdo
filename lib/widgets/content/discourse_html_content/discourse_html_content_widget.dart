@@ -8,6 +8,7 @@ import '../../../models/topic.dart';
 import '../../../providers/preferences_provider.dart';
 import '../../../services/discourse/discourse_service.dart';
 import '../../../services/emoji_handler.dart';
+import '../../../utils/discourse_url_parser.dart';
 import '../../../utils/link_launcher.dart';
 import 'discourse_widget_factory.dart';
 import 'builders/quote_card_builder.dart';
@@ -257,7 +258,7 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
 
     // 不追踪以下类型的链接：
     // 1. 用户链接 (/u/username) - 相当于 mention
-    if (RegExp(r'(?:linux\.do)?/u/[^/?#]+').hasMatch(url)) return;
+    if (DiscourseUrlParser.isUserLink(url)) return;
     // 2. 附件/上传链接
     if (url.contains('/uploads/')) return;
     // 3. Email 链接

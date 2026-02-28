@@ -5,6 +5,7 @@ import '../pages/topic_detail_page/topic_detail_page.dart';
 import '../pages/user_profile_page.dart';
 import '../pages/webview_page.dart';
 import '../constants.dart';
+import '../utils/discourse_url_parser.dart';
 import 'discourse/discourse_service.dart';
 
 /// Deep Link 服务
@@ -22,40 +23,6 @@ class DeepLinkService {
   /// 防重复：记录最近处理的链接和时间
   Uri? _lastHandledUri;
   DateTime? _lastHandledTime;
-
-  /// 话题链接正则（带 ID）
-  /// 支持格式：
-  /// - /t/topic-slug/123
-  /// - /t/topic-slug/123/5 (指定帖子编号)
-  /// - /t/topic/123 (topic 是固定占位符)
-  static final _topicWithIdRegex = RegExp(
-    r'/t/([^/]+)/(\d+)(?:/(\d+))?',
-    caseSensitive: false,
-  );
-
-  /// 话题链接正则（直接 ID）
-  /// 支持格式：
-  /// - /t/123 (直接跟 ID，没有 slug)
-  static final _topicIdOnlyRegex = RegExp(
-    r'/t/(\d+)(?:/(\d+))?(?:[/?#]|$)',
-    caseSensitive: false,
-  );
-
-  /// 话题链接正则（只有 slug）
-  /// 支持格式：
-  /// - /t/topic-slug (只有 slug，需要通过 API 查询)
-  static final _topicSlugOnlyRegex = RegExp(
-    r'/t/([^/\d][^/?#]*)$',
-    caseSensitive: false,
-  );
-
-  /// 用户链接正则
-  /// 支持格式：
-  /// - https://linux.do/u/username
-  static final _userRegex = RegExp(
-    r'/u/([^/?#]+)',
-    caseSensitive: false,
-  );
 
   /// 初始化服务
   /// 在主页面初始化后调用
@@ -115,66 +82,35 @@ class DeepLinkService {
     debugPrint('DeepLinkService: 收到链接 $url');
 
     // 尝试匹配用户链接 /u/username
-    final userMatch = _userRegex.firstMatch(uri.path);
-    if (userMatch != null) {
-      final username = userMatch.group(1);
-      if (username != null) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => UserProfilePage(username: username),
-          ),
-        );
-        return;
-      }
+    final userInfo = DiscourseUrlParser.parseUser(uri.path);
+    if (userInfo != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => UserProfilePage(username: userInfo.username),
+        ),
+      );
+      return;
     }
 
-    // 尝试匹配话题链接（直接 ID）：/t/123 或 /t/123/5
-    final topicIdOnlyMatch = _topicIdOnlyRegex.firstMatch(uri.path);
-    if (topicIdOnlyMatch != null) {
-      final topicId = int.tryParse(topicIdOnlyMatch.group(1) ?? '');
-      final postNumber = int.tryParse(topicIdOnlyMatch.group(2) ?? '');
-
-      if (topicId != null) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => TopicDetailPage(
-              topicId: topicId,
-              scrollToPostNumber: postNumber,
-            ),
+    // 尝试匹配话题链接（带 ID）：/t/123、/t/123/5、/t/topic-slug/123 等
+    final topicInfo = DiscourseUrlParser.parseTopic(uri.path);
+    if (topicInfo != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => TopicDetailPage(
+            topicId: topicInfo.topicId,
+            scrollToPostNumber: topicInfo.postNumber,
           ),
-        );
-        return;
-      }
-    }
-
-    // 尝试匹配话题链接（带 ID）：/t/topic-slug/123 或 /t/topic-slug/123/5
-    final topicWithIdMatch = _topicWithIdRegex.firstMatch(uri.path);
-    if (topicWithIdMatch != null) {
-      final topicId = int.tryParse(topicWithIdMatch.group(2) ?? '');
-      final postNumber = int.tryParse(topicWithIdMatch.group(3) ?? '');
-
-      if (topicId != null) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => TopicDetailPage(
-              topicId: topicId,
-              scrollToPostNumber: postNumber,
-            ),
-          ),
-        );
-        return;
-      }
+        ),
+      );
+      return;
     }
 
     // 尝试匹配话题链接（只有 slug）：/t/topic-slug
-    final topicSlugMatch = _topicSlugOnlyRegex.firstMatch(uri.path);
-    if (topicSlugMatch != null) {
-      final slug = topicSlugMatch.group(1);
-      if (slug != null) {
-        // 通过 slug 获取话题详情，提取真实的 topic ID
-        _handleTopicBySlug(context, slug);
-        return;
-      }
+    final topicSlug = DiscourseUrlParser.parseTopicSlug(uri.path);
+    if (topicSlug != null) {
+      _handleTopicBySlug(context, topicSlug);
+      return;
     }
 
     // 其他 linux.do 链接：使用内置浏览器

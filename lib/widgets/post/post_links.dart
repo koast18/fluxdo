@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/topic.dart';
 import '../../pages/topic_detail_page/topic_detail_page.dart';
+import '../../utils/discourse_url_parser.dart';
 
 /// 帖子相关链接组件
 ///
@@ -65,25 +66,16 @@ class _PostLinksState extends State<PostLinks> with SingleTickerProviderStateMix
 
   /// 处理链接点击
   void _onLinkTap(LinkCount link) {
-    final url = link.url;
-
-    // 解析 topic ID
-    // 链接格式：/t/topic-slug/12345 或 /t/topic-slug/12345/6
-    final topicMatch = RegExp(r'/t/([^/]+)/(\d+)(?:/\d+)?').firstMatch(url);
-    if (topicMatch != null) {
-      final topicId = int.tryParse(topicMatch.group(2) ?? '');
-
-      if (topicId != null) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => TopicDetailPage(
-              topicId: topicId,
-              initialTitle: link.title,
-            ),
+    final topicInfo = DiscourseUrlParser.parseTopic(link.url);
+    if (topicInfo != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => TopicDetailPage(
+            topicId: topicInfo.topicId,
+            initialTitle: link.title,
           ),
-        );
-        return;
-      }
+        ),
+      );
     }
   }
 
