@@ -290,6 +290,46 @@ extension _UserActions on _TopicDetailPageState {
     }
   }
 
+  /// 处理图片引用（quote 已在 ImageContextMenu 中构建好）
+  Future<void> _handleImageQuote(String quote, Post post) async {
+    final params = _params;
+    final detail = ref.read(topicDetailProvider(params)).value;
+
+    // 预加载草稿
+    final draftKey = Draft.replyKey(
+      widget.topicId,
+      replyToPostNumber: post.postNumber,
+    );
+    final preloadedDraftFuture = DiscourseService().getDraft(draftKey);
+
+    // 打开回复框，预填引用内容
+    final newPost = await showReplySheet(
+      context: context,
+      topicId: widget.topicId,
+      categoryId: detail?.categoryId,
+      replyToPost: post,
+      initialContent: quote,
+      preloadedDraftFuture: preloadedDraftFuture,
+    );
+
+    if (newPost != null && mounted) {
+      final addedToView = ref.read(topicDetailProvider(params).notifier).addPost(newPost);
+
+      if (addedToView) {
+        _scrollAfterKeyboardDismiss(newPost.postNumber);
+      } else {
+        if (mounted) {
+          ToastService.show(
+            '回复已发送',
+            type: ToastType.success,
+            actionLabel: '查看',
+            onAction: () => _scrollToPost(newPost.postNumber),
+          );
+        }
+      }
+    }
+  }
+
   /// 处理帖子级别的 MessageBus 更新
   void _handlePostUpdate(TopicDetailNotifier notifier, PostUpdate update) {
     switch (update.type) {

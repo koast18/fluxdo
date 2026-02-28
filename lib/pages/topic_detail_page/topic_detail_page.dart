@@ -978,6 +978,7 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage> with WidgetsB
               onNotificationLevelChanged: (level) => _handleNotificationLevelChanged(notifier, level),
               onSolutionChanged: _handleSolutionChanged,
               onQuoteSelection: isLoggedIn ? _handleQuoteSelection : null,
+              onQuoteImage: isLoggedIn ? _handleImageQuote : null,
               onScrollNotification: _controller.handleScrollNotification,
             );
           },

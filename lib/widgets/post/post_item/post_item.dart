@@ -50,6 +50,10 @@ class PostItem extends ConsumerStatefulWidget {
   final String? bottomDateSeparatorLabel;
   final void Function(String selectedText, Post post)? onQuoteSelection;
 
+  /// 图片引用回调（长按图片 → 引用）
+  /// 参数为已构建好的 quote BBCode 和对应的 Post
+  final void Function(String quote, Post post)? onQuoteImage;
+
   const PostItem({
     super.key,
     required this.post,
@@ -68,6 +72,7 @@ class PostItem extends ConsumerStatefulWidget {
     this.dateSeparatorLabel,
     this.bottomDateSeparatorLabel,
     this.onQuoteSelection,
+    this.onQuoteImage,
   });
 
   @override
@@ -493,6 +498,7 @@ class _PostItemState extends ConsumerState<PostItem> {
                         mentionedUsers: post.mentionedUsers,
                         post: post,
                         topicId: widget.topicId,
+                        onQuoteImage: widget.onQuoteImage,
                         onInternalLinkTap: (topicId, topicSlug, postNumber) {
                           Navigator.of(context).push(
                             MaterialPageRoute(

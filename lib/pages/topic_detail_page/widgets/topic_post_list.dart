@@ -43,6 +43,8 @@ class TopicPostList extends StatefulWidget {
   final void Function(TopicNotificationLevel)? onNotificationLevelChanged;
   final void Function(int postId, bool accepted)? onSolutionChanged;
   final void Function(String selectedText, Post post)? onQuoteSelection;
+  /// 图片引用回调（长按图片 → 引用）
+  final void Function(String quote, Post post)? onQuoteImage;
   final bool Function(ScrollNotification) onScrollNotification;
 
   const TopicPostList({
@@ -71,6 +73,7 @@ class TopicPostList extends StatefulWidget {
     this.onNotificationLevelChanged,
     this.onSolutionChanged,
     this.onQuoteSelection,
+    this.onQuoteImage,
     required this.onScrollNotification,
   });
 
@@ -116,6 +119,7 @@ class _TopicPostListState extends State<TopicPostList> {
   void Function(TopicNotificationLevel)? get onNotificationLevelChanged => widget.onNotificationLevelChanged;
   void Function(int postId, bool accepted)? get onSolutionChanged => widget.onSolutionChanged;
   void Function(String selectedText, Post post)? get onQuoteSelection => widget.onQuoteSelection;
+  void Function(String quote, Post post)? get onQuoteImage => widget.onQuoteImage;
   bool Function(ScrollNotification) get onScrollNotification => widget.onScrollNotification;
   void Function(Set<int> visiblePostNumbers)? get onVisiblePostsChanged => widget.onVisiblePostsChanged;
 
@@ -431,6 +435,7 @@ class _TopicPostListState extends State<TopicPostList> {
               onJumpToPost: onJumpToPost,
               onSolutionChanged: onSolutionChanged,
               onQuoteSelection: onQuoteSelection,
+              onQuoteImage: onQuoteImage,
             ),
           ],
         ),

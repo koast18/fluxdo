@@ -41,6 +41,9 @@ class ChunkedHtmlContent extends StatefulWidget {
   /// 自定义右键/长按菜单构建器
   final Widget Function(BuildContext, SelectableRegionState)? contextMenuBuilder;
 
+  /// 图片引用回调（长按图片 → 引用 → 打开回复框）
+  final void Function(String quote, Post post)? onQuoteImage;
+
   /// 获取 HTML 分块结果，不需要分块时返回 null
   static List<HtmlChunk>? getChunks(String html) {
     if (html.length <= chunkThreshold) return null;
@@ -83,6 +86,7 @@ class ChunkedHtmlContent extends StatefulWidget {
     this.topicId,
     this.onSelectionChanged,
     this.contextMenuBuilder,
+    this.onQuoteImage,
   });
 
   @override
@@ -151,6 +155,7 @@ class _ChunkedHtmlContentState extends State<ChunkedHtmlContent> {
         topicId: widget.topicId,
         onSelectionChanged: widget.onSelectionChanged,
         contextMenuBuilder: widget.contextMenuBuilder,
+        onQuoteImage: widget.onQuoteImage,
       );
     }
 
@@ -171,6 +176,7 @@ class _ChunkedHtmlContentState extends State<ChunkedHtmlContent> {
         fullHtml: widget.html,
         post: widget.post,
         topicId: widget.topicId,
+        onQuoteImage: widget.onQuoteImage,
       ));
     }
 
@@ -216,6 +222,9 @@ class HtmlChunkWidget extends StatelessWidget {
   /// 自定义右键/长按菜单构建器
   final Widget Function(BuildContext, SelectableRegionState)? contextMenuBuilder;
 
+  /// 图片引用回调
+  final void Function(String quote, Post post)? onQuoteImage;
+
   const HtmlChunkWidget({
     super.key,
     required this.chunk,
@@ -232,6 +241,7 @@ class HtmlChunkWidget extends StatelessWidget {
     this.enableSelectionArea = false,
     this.onSelectionChanged,
     this.contextMenuBuilder,
+    this.onQuoteImage,
   });
 
   @override
@@ -253,6 +263,7 @@ class HtmlChunkWidget extends StatelessWidget {
         topicId: topicId,
         onSelectionChanged: onSelectionChanged,
         contextMenuBuilder: contextMenuBuilder,
+        onQuoteImage: onQuoteImage,
       ),
     );
   }

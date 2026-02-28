@@ -2,7 +2,9 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../../../models/topic.dart';
 import '../../../services/discourse_cache_manager.dart';
+import '../../common/image_context_menu.dart';
 
 import 'builders/video_builder.dart';
 import 'image_utils.dart';
@@ -17,6 +19,13 @@ class DiscourseWidgetFactory extends WidgetFactory {
   /// 已揭示的 spoiler 图片 URL 集合（引用 State 的 Set，实时反映揭示状态）
   final Set<String> revealedImageUrls;
 
+  /// Post 上下文（用于引用功能）
+  final Post? post;
+  final int? topicId;
+
+  /// 引用图片回调（插入回复框）
+  final void Function(String quote, Post post)? onQuoteImage;
+
   /// 获取画廊图片列表（原图 URL）
   List<String> get galleryImages => galleryInfo?.images ?? [];
 
@@ -29,6 +38,9 @@ class DiscourseWidgetFactory extends WidgetFactory {
     required this.context,
     this.galleryInfo,
     Set<String>? revealedImageUrls,
+    this.post,
+    this.topicId,
+    this.onQuoteImage,
   }) : revealedImageUrls = revealedImageUrls ?? {};
 
   @override
@@ -205,8 +217,15 @@ class DiscourseWidgetFactory extends WidgetFactory {
              return emojiWidget;
            }
 
-           // 非画廊图片：与 Discourse 一致，不添加点击查看功能
-           // 只有 lightbox 图片（画廊图片）才能点击打开查看器
+           // 非画廊图片：不添加点击查看功能，但支持长按菜单查看大图
+           if (resolvedUrl != null) {
+             return GestureDetector(
+               onLongPress: () {
+                 _showImageContextMenu(context, resolvedUrl, heroTag);
+               },
+               child: imageWidget,
+             );
+           }
            return imageWidget;
         }
 
@@ -250,6 +269,9 @@ class DiscourseWidgetFactory extends WidgetFactory {
                 fullGalleryIndex: galleryIndex,
                 thumbnailUrl: resolvedUrl,
               );
+            },
+            onLongPress: () {
+              _showImageContextMenu(context, resolvedUrl!, heroTag);
             },
           );
         }
@@ -304,6 +326,17 @@ class DiscourseWidgetFactory extends WidgetFactory {
           onLoadingBuilder(context, tree, null, url) ?? widget0,
       loop: loop,
       poster: poster,
+    );
+  }
+
+  /// 显示图片长按菜单
+  void _showImageContextMenu(BuildContext context, String imageUrl, String heroTag) {
+    ImageContextMenu.show(
+      context: context,
+      imageUrl: imageUrl,
+      post: post,
+      topicId: topicId,
+      onQuoteImage: onQuoteImage,
     );
   }
 

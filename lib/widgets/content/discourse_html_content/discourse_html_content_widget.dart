@@ -64,6 +64,8 @@ class DiscourseHtmlContent extends ConsumerStatefulWidget {
   final void Function(SelectedContent?)? onSelectionChanged;
   /// 自定义右键/长按菜单构建器
   final Widget Function(BuildContext, SelectableRegionState)? contextMenuBuilder;
+  /// 图片引用回调（长按图片 → 引用 → 打开回复框）
+  final void Function(String quote, Post post)? onQuoteImage;
 
   const DiscourseHtmlContent({
     super.key,
@@ -85,6 +87,7 @@ class DiscourseHtmlContent extends ConsumerStatefulWidget {
     this.screenshotMode = false,
     this.onSelectionChanged,
     this.contextMenuBuilder,
+    this.onQuoteImage,
   });
 
   @override
@@ -131,6 +134,9 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
       context: context,
       galleryInfo: _galleryInfo,
       revealedImageUrls: _revealedImageUrls,
+      post: widget.post,
+      topicId: widget.topicId,
+      onQuoteImage: widget.onQuoteImage,
     );
   }
 
@@ -494,6 +500,7 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
           enableSelectionArea: widget.enableSelectionArea,
           enablePanguSpacing: widget.enablePanguSpacing,
           screenshotMode: widget.screenshotMode,
+          onQuoteImage: widget.onQuoteImage,
         ),
       );
     }

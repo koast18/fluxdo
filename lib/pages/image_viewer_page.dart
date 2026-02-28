@@ -9,6 +9,7 @@ import '../utils/svg_utils.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
 import '../services/toast_service.dart';
+import '../widgets/common/image_context_menu.dart';
 import '../widgets/common/loading_spinner.dart';
 
 class ImageViewerPage extends StatefulWidget {
@@ -147,6 +148,15 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       _showUI = !_showUI;
     });
     _updateSystemUI();
+  }
+
+  /// 显示图片长按菜单（不含「查看大图」，因为已在查看页内）
+  void _showContextMenu(BuildContext context) {
+    ImageContextMenu.show(
+      context: context,
+      imageUrl: _currentImageUrl,
+      showViewFullImage: false,
+    );
   }
 
   void _hideUI() {
@@ -428,6 +438,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
               // 单图模式：使用最简结构，避免 PageView 带来的空白/手势问题
               GestureDetector(
                 onTap: _toggleUI,
+                onLongPress: () => _showContextMenu(context),
                 child: ExtendedImage(
                   image: discourseImageProvider(widget.imageUrl!),
                   width: double.infinity,
@@ -487,6 +498,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
               // 画廊模式：使用 ExtendedImageGesturePageView 支持滑动切换
               GestureDetector(
                 onTap: _toggleUI,
+                onLongPress: () => _showContextMenu(context),
                 child: ExtendedImageGesturePageView.builder(
                   itemCount: images.length,
                   physics: const BouncingScrollPhysics(),

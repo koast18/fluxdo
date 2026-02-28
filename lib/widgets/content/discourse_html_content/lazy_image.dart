@@ -14,6 +14,9 @@ class LazyImage extends StatefulWidget {
   final String heroTag;
   final VoidCallback? onTap;
 
+  /// 长按回调
+  final VoidCallback? onLongPress;
+
   /// 缓存 key（用于判断是否已加载，默认使用 heroTag）
   final String? cacheKey;
 
@@ -28,6 +31,7 @@ class LazyImage extends StatefulWidget {
     this.fit = BoxFit.contain,
     required this.heroTag,
     this.onTap,
+    this.onLongPress,
     this.cacheKey,
     this.visibilityThreshold = 0.01,
   });
@@ -159,6 +163,7 @@ class _LazyImageState extends State<LazyImage> {
     Widget imageWidget = HeroImage(
       heroTag: widget.heroTag,
       onTap: widget.onTap,
+      onLongPress: widget.onLongPress,
       child: imageChild,
     );
 
