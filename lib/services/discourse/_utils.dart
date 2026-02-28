@@ -55,6 +55,13 @@ mixin _UtilsMixin on _DiscourseServiceBase {
 
       final respData = response.data;
 
+      // 帖子进入审核队列
+      if (respData is Map && respData['action'] == 'enqueued') {
+        throw PostEnqueuedException(
+          pendingCount: respData['pending_count'] as int? ?? 0,
+        );
+      }
+
       if (respData is Map && respData.containsKey('post') && respData['post']['topic_id'] != null) {
         return respData['post']['topic_id'] as int;
       }

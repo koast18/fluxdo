@@ -8,6 +8,8 @@ import '../../services/discourse/discourse_service.dart';
 import '../../services/presence_service.dart';
 import '../../services/emoji_handler.dart';
 import '../../services/draft_controller.dart';
+import '../../services/network/exceptions/api_exception.dart';
+import '../../services/toast_service.dart';
 import '../common/smart_avatar.dart';
 import '../common/loading_spinner.dart';
 
@@ -393,6 +395,13 @@ class _ReplySheetState extends ConsumerState<ReplySheet> {
         if (!mounted) return;
         Navigator.of(context).pop(newPost);
       }
+    } on PostEnqueuedException {
+      // 审核场景：删除草稿，提示用户，关闭编辑器
+      await _draftController?.deleteDraft();
+      _submitted = true;
+      if (!mounted) return;
+      ToastService.showInfo('你的帖子已提交，正在等待审核');
+      Navigator.of(context).pop();
     } catch (_) {
       // 错误已由 ErrorInterceptor 处理
     } finally {

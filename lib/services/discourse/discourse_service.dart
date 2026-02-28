@@ -25,6 +25,7 @@ import '../cf_challenge_service.dart';
 import '../network/discourse_dio.dart';
 import '../preloaded_data_service.dart';
 import '../auth_log_service.dart';
+import '../network/exceptions/api_exception.dart';
 
 part '_auth.dart';
 part '_topics.dart';

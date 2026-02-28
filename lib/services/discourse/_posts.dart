@@ -26,6 +26,13 @@ mixin _PostsMixin on _DiscourseServiceBase {
 
       final respData = response.data;
 
+      // 帖子进入审核队列
+      if (respData is Map && respData['action'] == 'enqueued') {
+        throw PostEnqueuedException(
+          pendingCount: respData['pending_count'] as int? ?? 0,
+        );
+      }
+
       if (respData is Map && respData.containsKey('post') && respData['post'] != null) {
         return Post.fromJson(respData['post'] as Map<String, dynamic>);
       }

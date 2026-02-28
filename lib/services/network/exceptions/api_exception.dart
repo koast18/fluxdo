@@ -16,6 +16,15 @@ class ServerException implements Exception {
   String toString() => '服务器暂时不可用 ($statusCode)';
 }
 
+/// 帖子进入审核队列异常
+class PostEnqueuedException implements Exception {
+  final int pendingCount;
+  PostEnqueuedException({this.pendingCount = 0});
+
+  @override
+  String toString() => '你的帖子已提交，正在等待审核';
+}
+
 /// Cloudflare 验证异常
 class CfChallengeException implements Exception {
   final bool userCancelled;
