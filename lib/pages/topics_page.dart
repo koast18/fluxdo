@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -78,7 +77,6 @@ class _TopicsPageState extends ConsumerState<TopicsPage> with TickerProviderStat
   final Map<int?, GlobalKey<_TopicListState>> _listKeys = {};
 
   final ScrollController _outerScrollController = ScrollController();
-  Timer? _snapTimer;
   AnimationController? _snapAnim;
   bool _isSnapping = false;
 
@@ -89,14 +87,11 @@ class _TopicsPageState extends ConsumerState<TopicsPage> with TickerProviderStat
     _tabLength = 1 + pinnedIds.length;
     _tabController = TabController(length: _tabLength, vsync: this);
     _tabController.addListener(_handleTabChange);
-    _outerScrollController.addListener(_scheduleSnap);
   }
 
   @override
   void dispose() {
-    _snapTimer?.cancel();
     _snapAnim?.dispose();
-    _outerScrollController.removeListener(_scheduleSnap);
     _outerScrollController.dispose();
     _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
@@ -375,94 +370,98 @@ class _TopicsPageState extends ConsumerState<TopicsPage> with TickerProviderStat
 
     return Listener(
       onPointerDown: (_) => _cancelSnap(),
-      child: ExtendedNestedScrollView(
-      controller: _outerScrollController,
-      floatHeaderSlivers: true,
-      pinnedHeaderSliverHeightBuilder: () => topPadding + _tabRowHeight,
-      onlyOneScrollInBody: true,
-      headerSliverBuilder: (context, innerBoxIsScrolled) => [
-        SliverPersistentHeader(
-          pinned: true,
-          floating: true,
-          delegate: _TopicsHeaderDelegate(
-            statusBarHeight: topPadding,
-            tabController: _tabController,
-            pinnedIds: pinnedIds,
-            categoryMap: categoryMapAsync.value ?? {},
-            isLoggedIn: isLoggedIn,
-            currentSort: currentSort,
-            currentTags: currentTags,
-            currentCategory: currentCategory,
-            onSortChanged: (sort) {
-              ref.read(topicSortProvider.notifier).setSort(sort);
-            },
-            onTagRemoved: (tag) {
-              final tags = ref.read(tabTagsProvider(currentCategoryId));
-              ref.read(tabTagsProvider(currentCategoryId).notifier).state =
-                  tags.where((t) => t != tag).toList();
-            },
-            onAddTag: _openTagSelection,
-            onTabTap: (index) {
-              if (index == _currentTabIndex) {
-                _getListKey(_currentCategoryId()).currentState?.scrollToTop();
-              }
-            },
-            onCategoryManager: _openCategoryManager,
-            onSearch: () {
-              SearchFilter? filter;
-              if (currentCategory != null) {
-                String? parentSlug;
-                if (currentCategory.parentCategoryId != null) {
-                  parentSlug = categoryMapAsync.value?[currentCategory.parentCategoryId]?.slug;
-                }
-                filter = SearchFilter(
-                  categoryId: currentCategory.id,
-                  categorySlug: currentCategory.slug,
-                  categoryName: currentCategory.name,
-                  parentCategorySlug: parentSlug,
-                );
-              }
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => SearchPage(initialFilter: filter)),
-              );
-            },
-            onDebugTopicId: () => _showTopicIdDialog(context),
-            trailing: _buildTrailing(currentCategory, isLoggedIn, currentSort),
+      child: NotificationListener<ScrollNotification>(
+        onNotification: _handleOuterScrollNotification,
+        child: ExtendedNestedScrollView(
+          controller: _outerScrollController,
+          floatHeaderSlivers: true,
+          pinnedHeaderSliverHeightBuilder: () => topPadding + _tabRowHeight,
+          onlyOneScrollInBody: true,
+          headerSliverBuilder: (context, innerBoxIsScrolled) => [
+            SliverPersistentHeader(
+              pinned: true,
+              floating: true,
+              delegate: _TopicsHeaderDelegate(
+                statusBarHeight: topPadding,
+                tabController: _tabController,
+                pinnedIds: pinnedIds,
+                categoryMap: categoryMapAsync.value ?? {},
+                isLoggedIn: isLoggedIn,
+                currentSort: currentSort,
+                currentTags: currentTags,
+                currentCategory: currentCategory,
+                onSortChanged: (sort) {
+                  ref.read(topicSortProvider.notifier).setSort(sort);
+                },
+                onTagRemoved: (tag) {
+                  final tags = ref.read(tabTagsProvider(currentCategoryId));
+                  ref.read(tabTagsProvider(currentCategoryId).notifier).state =
+                      tags.where((t) => t != tag).toList();
+                },
+                onAddTag: _openTagSelection,
+                onTabTap: (index) {
+                  if (index == _currentTabIndex) {
+                    _getListKey(_currentCategoryId()).currentState?.scrollToTop();
+                  }
+                },
+                onCategoryManager: _openCategoryManager,
+                onSearch: () {
+                  SearchFilter? filter;
+                  if (currentCategory != null) {
+                    String? parentSlug;
+                    if (currentCategory.parentCategoryId != null) {
+                      parentSlug = categoryMapAsync.value?[currentCategory.parentCategoryId]?.slug;
+                    }
+                    filter = SearchFilter(
+                      categoryId: currentCategory.id,
+                      categorySlug: currentCategory.slug,
+                      categoryName: currentCategory.name,
+                      parentCategorySlug: parentSlug,
+                    );
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => SearchPage(initialFilter: filter)),
+                  );
+                },
+                onDebugTopicId: () => _showTopicIdDialog(context),
+                trailing: _buildTrailing(currentCategory, isLoggedIn, currentSort),
+              ),
+            ),
+          ],
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              ExtendedVisibilityDetector(
+                uniqueKey: const Key('tab_all'),
+                child: _buildTabPage(null),
+              ),
+              for (int i = 0; i < pinnedIds.length; i++)
+                ExtendedVisibilityDetector(
+                  uniqueKey: Key('tab_${pinnedIds[i]}'),
+                  child: _buildTabPage(pinnedIds[i]),
+                ),
+            ],
           ),
         ),
-      ],
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          ExtendedVisibilityDetector(
-            uniqueKey: const Key('tab_all'),
-            child: _buildTabPage(null),
-          ),
-          for (int i = 0; i < pinnedIds.length; i++)
-            ExtendedVisibilityDetector(
-              uniqueKey: Key('tab_${pinnedIds[i]}'),
-              child: _buildTabPage(pinnedIds[i]),
-            ),
-        ],
-      ),
       ),
     );
   }
 
-  /// outer scroll 位置变化时，重置定时器；
-  /// 位置停止变化 150ms 后触发 snap 判定。
-  void _scheduleSnap() {
-    if (_isSnapping) return; // snap 动画期间的 forcePixels 触发，忽略
-    _snapTimer?.cancel();
-    _snapTimer = Timer(const Duration(milliseconds: 30), () {
-      if (mounted) _snapOuterScroll();
-    });
+  bool _handleOuterScrollNotification(ScrollNotification notification) {
+    if (notification.depth != 0) return false;
+
+    if (notification is ScrollEndNotification && !_isSnapping) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _snapOuterScroll();
+      });
+    }
+
+    return false;
   }
 
   /// 取消正在进行的 snap
   void _cancelSnap() {
-    _snapTimer?.cancel();
     if (_isSnapping) {
       _snapAnim?.stop();
       _isSnapping = false;
