@@ -262,6 +262,44 @@ class Pangu {
       return entityManager.store(match.group(0) ?? '');
     });
 
+    // 保护 Markdown 粗体/斜体/删除线标记
+    final mdFormattingManager =
+        _PlaceholderReplacer('MD_FMT_', '\uE014', '\uE015');
+    // ***bold italic*** (三星号，最先匹配)
+    newText = newText.replaceAllMapped(
+      RegExp(r'\*{3}(?!\s)(.+?)(?<!\s)\*{3}'),
+      (match) => mdFormattingManager.store(match.group(0) ?? ''),
+    );
+    // **bold** (双星号)
+    newText = newText.replaceAllMapped(
+      RegExp(r'\*{2}(?!\s)(.+?)(?<!\s)\*{2}'),
+      (match) => mdFormattingManager.store(match.group(0) ?? ''),
+    );
+    // *italic* (单星号，排除 word 字符相邻的乘号场景)
+    newText = newText.replaceAllMapped(
+      RegExp(r'(?<![*\w])\*(?!\s)(.+?)(?<!\s)\*(?![*\w])'),
+      (match) => mdFormattingManager.store(match.group(0) ?? ''),
+    );
+    // ~~strikethrough~~ (删除线)
+    newText = newText.replaceAllMapped(
+      RegExp(r'~~(?!\s)(.+?)(?<!\s)~~'),
+      (match) => mdFormattingManager.store(match.group(0) ?? ''),
+    );
+
+    // 保护 BBCode 标签 ([b], [/b], [color=red], [url="..."] 等)
+    final bbcodeTagManager =
+        _PlaceholderReplacer('BBCODE_TAG_', '\uE016', '\uE017');
+    var hasBbcodeTags = false;
+    if (newText.contains('[')) {
+      final bbcodePattern = RegExp(r'\[/?[a-zA-Z][a-zA-Z0-9]*(?:=[^\]]*)?]');
+      if (bbcodePattern.hasMatch(newText)) {
+        hasBbcodeTags = true;
+        newText = newText.replaceAllMapped(bbcodePattern, (match) {
+          return bbcodeTagManager.store(match.group(0) ?? '');
+        });
+      }
+    }
+
     final htmlTagManager =
         _PlaceholderReplacer('HTML_TAG_PLACEHOLDER_', '\uE000', '\uE001');
     var hasHtmlTags = false;
@@ -415,6 +453,11 @@ class Pangu {
       newText = htmlTagManager.restore(newText);
     }
 
+    if (hasBbcodeTags) {
+      newText = bbcodeTagManager.restore(newText);
+    }
+
+    newText = mdFormattingManager.restore(newText);
     newText = entityManager.restore(newText);
     newText = emojiManager.restore(newText);
     newText = autoLinkManager.restore(newText);
