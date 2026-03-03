@@ -11,14 +11,17 @@ import '../../constants.dart';
 import '../../utils/font_awesome_helper.dart';
 import '../../utils/share_utils.dart';
 import '../../services/discourse_cache_manager.dart';
+import '../../pages/topic_detail_page/topic_detail_page.dart';
+import '../common/loading_spinner.dart';
 import '../common/relative_time_text.dart';
 import '../../utils/number_utils.dart';
 import '../common/emoji_text.dart';
 import '../common/smart_avatar.dart';
 import '../common/topic_badges.dart';
+import '../content/discourse_html_content/discourse_html_content.dart';
 
 /// 话题预览弹窗 - 长按卡片时显示
-class TopicPreviewDialog extends ConsumerWidget {
+class TopicPreviewDialog extends ConsumerStatefulWidget {
   final Topic topic;
   final VoidCallback? onOpen;
 
@@ -27,6 +30,9 @@ class TopicPreviewDialog extends ConsumerWidget {
     required this.topic,
     this.onOpen,
   });
+
+  @override
+  ConsumerState<TopicPreviewDialog> createState() => _TopicPreviewDialogState();
 
   /// 显示预览弹窗
   static Future<void> show(
@@ -64,9 +70,40 @@ class TopicPreviewDialog extends ConsumerWidget {
       },
     );
   }
+}
+
+class _TopicPreviewDialogState extends ConsumerState<TopicPreviewDialog> {
+  String? _firstPostCooked;
+  bool _isLoading = true;
+  bool _loadFailed = false;
+
+  Topic get topic => widget.topic;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void initState() {
+    super.initState();
+    _loadFirstPost();
+  }
+
+  Future<void> _loadFirstPost() async {
+    try {
+      final cooked = await ref.read(discourseServiceProvider).getTopicFirstPostCooked(topic.id);
+      if (!mounted) return;
+      setState(() {
+        _firstPostCooked = cooked;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadFailed = true;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final screenSize = MediaQuery.of(context).size;
     final maxWidth = screenSize.width * 0.9;
@@ -138,11 +175,9 @@ class TopicPreviewDialog extends ConsumerWidget {
                         _buildCategoryAndTags(context, theme, category, faIcon, logoUrl),
                       ],
 
-                      // 摘要内容
-                      if (topic.excerpt != null && topic.excerpt!.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        _buildExcerpt(context, theme),
-                      ],
+                      // 主贴内容
+                      const SizedBox(height: 16),
+                      _buildPostContent(context, theme),
 
                       const SizedBox(height: 16),
 
@@ -158,10 +193,79 @@ class TopicPreviewDialog extends ConsumerWidget {
               ),
 
               // 底部操作栏
-              _buildActions(context, theme, ref),
+              _buildActions(context, theme),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPostContent(BuildContext context, ThemeData theme) {
+    if (_isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 20),
+          child: LoadingSpinner(size: 24),
+        ),
+      );
+    }
+
+    if (_firstPostCooked != null && _firstPostCooked!.isNotEmpty && !_loadFailed) {
+      // 加载成功：渲染主贴 HTML
+      return DiscourseHtmlContent(
+        html: _firstPostCooked!,
+        compact: true,
+        onInternalLinkTap: (topicId, topicSlug, postNumber) {
+          Navigator.of(context).pop();
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => TopicDetailPage(
+                topicId: topicId,
+                initialTitle: topicSlug,
+                scrollToPostNumber: postNumber,
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    // 加载失败：降级展示 excerpt
+    if (topic.excerpt != null && topic.excerpt!.isNotEmpty) {
+      return _buildExcerptFallback(theme);
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildExcerptFallback(ThemeData theme) {
+    final cleanExcerpt = topic.excerpt!
+        .replaceAll(RegExp(r'<[^>]*>'), '')
+        .replaceAll('&hellip;', '...')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .trim();
+
+    if (cleanExcerpt.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        cleanExcerpt,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+          height: 1.6,
+        ),
+        maxLines: 8,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }
@@ -365,38 +469,6 @@ class TopicPreviewDialog extends ConsumerWidget {
     );
   }
 
-  Widget _buildExcerpt(BuildContext context, ThemeData theme) {
-    // 清理 excerpt 中的 HTML 标签
-    final cleanExcerpt = topic.excerpt!
-        .replaceAll(RegExp(r'<[^>]*>'), '')
-        .replaceAll('&hellip;', '...')
-        .replaceAll('&amp;', '&')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&quot;', '"')
-        .replaceAll('&#39;', "'")
-        .trim();
-
-    if (cleanExcerpt.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        cleanExcerpt,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-          height: 1.6,
-        ),
-        maxLines: 8,
-        overflow: TextOverflow.ellipsis,
-      ),
-    );
-  }
-
   Widget _buildParticipants(BuildContext context, ThemeData theme) {
     final participants = topic.posters.take(5).toList();
 
@@ -536,7 +608,7 @@ class TopicPreviewDialog extends ConsumerWidget {
     );
   }
 
-  Widget _buildActions(BuildContext context, ThemeData theme, WidgetRef ref) {
+  Widget _buildActions(BuildContext context, ThemeData theme) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -579,7 +651,7 @@ class TopicPreviewDialog extends ConsumerWidget {
           FilledButton.icon(
             onPressed: () {
               Navigator.of(context).pop();
-              onOpen?.call();
+              widget.onOpen?.call();
             },
             icon: const Icon(Icons.open_in_new, size: 18),
             label: const Text('查看详情'),

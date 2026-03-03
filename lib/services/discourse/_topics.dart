@@ -334,4 +334,15 @@ mixin _TopicsMixin on _DiscourseServiceBase {
       rethrow;
     }
   }
+
+  /// 获取话题主贴的 HTML 内容（轻量请求，只解析第一楼）
+  Future<String?> getTopicFirstPostCooked(int topicId) async {
+    final response = await _dio.get('/t/$topicId/1.json');
+    final data = response.data as Map<String, dynamic>;
+    final postStream = data['post_stream'] as Map<String, dynamic>?;
+    final posts = postStream?['posts'] as List<dynamic>?;
+    if (posts == null || posts.isEmpty) return null;
+    final firstPost = posts.first as Map<String, dynamic>;
+    return firstPost['cooked'] as String?;
+  }
 }
