@@ -93,6 +93,23 @@ class PreferencesPage extends ConsumerWidget {
                     ref.read(preferencesProvider.notifier).setAutoFillLogin(value);
                   },
                 ),
+                if (Platform.isIOS || Platform.isAndroid) ...[
+                  Divider(height: 1, indent: 56, color: theme.colorScheme.outlineVariant.withValues(alpha:0.3)),
+                  SwitchListTile(
+                    title: const Text('竖屏锁定'),
+                    subtitle: const Text('锁定屏幕方向为竖屏'),
+                    secondary: Icon(
+                      Icons.screen_lock_portrait_rounded,
+                      color: preferences.portraitLock
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                    value: preferences.portraitLock,
+                    onChanged: (value) {
+                      ref.read(preferencesProvider.notifier).setPortraitLock(value);
+                    },
+                  ),
+                ],
               ],
             ),
           ),

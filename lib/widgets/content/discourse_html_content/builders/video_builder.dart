@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart' as lib;
 import 'package:window_manager/window_manager.dart';
 
+import '../../../../providers/preferences_provider.dart';
 import '../../../../utils/layout_lock.dart';
 
 /// 自定义视频播放器，基于 fwfh_chewie 的 VideoPlayer，
@@ -202,6 +203,8 @@ class _DiscourseVideoPlayerState extends State<DiscourseVideoPlayer>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!_didLockLayout) {
           LayoutLock.release();
+          // 恢复竖屏锁定（chewie 退出全屏会重置方向为全部允许）
+          PreferencesNotifier.restoreOrientationLock();
         }
       });
     }

@@ -21,6 +21,8 @@ class AppPreferences {
   final bool autoFillLogin;
   /// 崩溃日志上报（仅 Android）
   final bool crashlytics;
+  /// 竖屏锁定
+  final bool portraitLock;
 
   const AppPreferences({
     required this.autoPanguSpacing,
@@ -32,6 +34,7 @@ class AppPreferences {
     required this.shareImageThemeIndex,
     required this.autoFillLogin,
     required this.crashlytics,
+    required this.portraitLock,
   });
 
   AppPreferences copyWith({
@@ -44,6 +47,7 @@ class AppPreferences {
     int? shareImageThemeIndex,
     bool? autoFillLogin,
     bool? crashlytics,
+    bool? portraitLock,
   }) {
     return AppPreferences(
       autoPanguSpacing: autoPanguSpacing ?? this.autoPanguSpacing,
@@ -56,6 +60,7 @@ class AppPreferences {
       shareImageThemeIndex: shareImageThemeIndex ?? this.shareImageThemeIndex,
       autoFillLogin: autoFillLogin ?? this.autoFillLogin,
       crashlytics: crashlytics ?? this.crashlytics,
+      portraitLock: portraitLock ?? this.portraitLock,
     );
   }
 }
@@ -71,6 +76,7 @@ class PreferencesNotifier extends StateNotifier<AppPreferences> {
   static const String _shareImageThemeIndexKey = 'pref_share_image_theme_index';
   static const String _autoFillLoginKey = 'pref_auto_fill_login';
   static const String _crashlyticsKey = 'pref_crashlytics';
+  static const String _portraitLockKey = 'pref_portrait_lock';
 
   static const _crashlyticsChannel =
       MethodChannel('com.github.lingyan000.fluxdo/crashlytics');
@@ -88,8 +94,11 @@ class PreferencesNotifier extends StateNotifier<AppPreferences> {
             shareImageThemeIndex: _prefs.getInt(_shareImageThemeIndexKey) ?? 0,
             autoFillLogin: _prefs.getBool(_autoFillLoginKey) ?? true,
             crashlytics: _prefs.getBool(_crashlyticsKey) ?? false,
+            portraitLock: _prefs.getBool(_portraitLockKey) ?? false,
           ),
-        );
+        ) {
+    isPortraitLocked = state.portraitLock;
+  }
 
   final SharedPreferences _prefs;
 
@@ -143,6 +152,34 @@ class PreferencesNotifier extends StateNotifier<AppPreferences> {
         'setCrashlyticsEnabled',
         {'enabled': enabled},
       );
+    }
+  }
+
+  Future<void> setPortraitLock(bool enabled) async {
+    state = state.copyWith(portraitLock: enabled);
+    await _prefs.setBool(_portraitLockKey, enabled);
+    isPortraitLocked = enabled;
+    if (enabled) {
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    } else {
+      await SystemChrome.setPreferredOrientations([]);
+    }
+  }
+
+  /// 当前竖屏锁定状态（供视频播放器等无法访问 ref 的组件使用）
+  static bool isPortraitLocked = false;
+
+  /// 恢复方向锁定设置
+  /// 视频退出全屏后调用，重新应用竖屏锁定
+  static Future<void> restoreOrientationLock() async {
+    if (isPortraitLocked) {
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
     }
   }
 }

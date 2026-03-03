@@ -36,6 +36,7 @@ import 'constants.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ai_model_manager/ai_model_manager.dart';
+import 'providers/preferences_provider.dart';
 import 'providers/theme_provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'widgets/preheat_gate.dart';
@@ -82,6 +83,18 @@ Future<void> main() async {
       const MethodChannel('com.github.lingyan000.fluxdo/crashlytics')
           .invokeMethod('setCrashlyticsEnabled', {'enabled': true}),
   ]);
+
+  // 应用竖屏锁定设置（仅移动端）
+  if (Platform.isIOS || Platform.isAndroid) {
+    final portraitLock = prefs.getBool('pref_portrait_lock') ?? false;
+    if (portraitLock) {
+      PreferencesNotifier.isPortraitLocked = true;
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    }
+  }
 
   // 提前触发预加载数据请求，与 runApp 并行执行
   // PreheatGate 中的 ensureLoaded() 会复用这个已在进行的请求
