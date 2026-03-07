@@ -23,6 +23,8 @@ class DiscourseDio {
     Map<String, dynamic>? defaultHeaders,
     String? baseUrl,
     int? maxConcurrent = 6,
+    int? maxPerWindow,
+    Duration? windowDuration,
     bool enableRetry = true,
     bool enableCfChallenge = true,
   }) {
@@ -42,7 +44,11 @@ class DiscourseDio {
 
     // 2. 并发限制（null 表示不限制）
     if (maxConcurrent != null) {
-      dio.interceptors.add(RequestSchedulerInterceptor(maxConcurrent: maxConcurrent));
+      dio.interceptors.add(RequestSchedulerInterceptor(
+        maxConcurrent: maxConcurrent,
+        maxPerWindow: maxPerWindow ?? 10,
+        windowDuration: windowDuration ?? const Duration(seconds: 3),
+      ));
     }
 
     // 3. Cookie 管理

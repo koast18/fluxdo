@@ -53,6 +53,7 @@ class PreloadedDataService {
   /// 是否已加载数据
   bool get isLoaded => _loaded;
   Map<String, dynamic>? get currentUserSync => _currentUser;
+  Map<String, dynamic>? get siteSettingsSync => _siteSettings;
   List<Map<String, dynamic>>? get topicTrackingStatesSync => _topicTrackingStates;
 
   /// 设置登录失效回调

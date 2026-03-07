@@ -1,30 +1,51 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'discourse/discourse_service.dart';
+import 'preloaded_data_service.dart';
 
 /// Presence 状态管理服务
 /// 用于在用户输入回复时通知服务器"正在输入"状态
+///
+/// 受以下条件控制，任一不满足则不发送请求：
+/// - 站点设置 `presence_enabled` 为 true
+/// - 用户设置 `hide_presence` 为 false
 class PresenceService {
   final DiscourseService _service;
-  
+
+  // 是否允许发送 presence（综合站点设置和用户设置）
+  final bool _enabled;
+
   // 当前活跃的频道
   final Set<String> _activeChannels = {};
-  
+
   // 定时刷新计时器（每 30 秒发送一次心跳）
   Timer? _heartbeatTimer;
   static const _heartbeatInterval = Duration(seconds: 30);
-  
+
   // 防抖计时器
   Timer? _debounceTimer;
   static const _debounceDelay = Duration(milliseconds: 500);
-  
-  PresenceService(this._service);
-  
+
+  PresenceService(this._service) : _enabled = _checkEnabled();
+
+  /// 检查站点设置和用户设置是否允许 presence
+  static bool _checkEnabled() {
+    final preloaded = PreloadedDataService();
+    // 站点未启用 presence 插件
+    if (preloaded.siteSettingsSync?['presence_enabled'] != true) return false;
+    // 用户选择隐藏 presence
+    final userOption = preloaded.currentUserSync?['user_option'] as Map<String, dynamic>?;
+    if (userOption?['hide_presence'] == true) return false;
+    return true;
+  }
+
   /// 进入回复频道
   void enterReplyChannel(int topicId) {
+    if (!_enabled) return;
+
     final channel = '/discourse-presence/reply/$topicId';
     if (_activeChannels.contains(channel)) return;
-    
+
     debugPrint('[PresenceService] 进入频道: $channel');
     _activeChannels.add(channel);
     _debouncedUpdate();
