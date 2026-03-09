@@ -174,6 +174,7 @@ class RequestSchedulerInterceptor extends Interceptor {
     if (_running < maxConcurrent && _rateLimiter.canProceed()) {
       _running++;
       _rateLimiter.record();
+      options.extra['_schedulerCounted'] = true;
       handler.next(options);
       return;
     }
@@ -219,13 +220,17 @@ class RequestSchedulerInterceptor extends Interceptor {
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
-    _release();
+    if (response.requestOptions.extra.remove('_schedulerCounted') == true) {
+      _release();
+    }
     handler.next(response);
   }
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    _release();
+    if (err.requestOptions.extra.remove('_schedulerCounted') == true) {
+      _release();
+    }
     handler.next(err);
   }
 
@@ -253,6 +258,7 @@ class RequestSchedulerInterceptor extends Interceptor {
 
       _running++;
       _rateLimiter.record();
+      entry.options.extra['_schedulerCounted'] = true;
       entry.completer.complete();
     }
   }

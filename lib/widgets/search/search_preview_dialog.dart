@@ -145,7 +145,7 @@ class SearchPreviewDialog extends ConsumerWidget {
                       // 摘要内容
                       if (post.blurb.isNotEmpty) ...[
                         const SizedBox(height: 16),
-                        _buildBlurb(context, theme),
+                        _buildBlurb(context, theme, ref),
                       ],
 
                       const SizedBox(height: 16),
@@ -344,7 +344,7 @@ class SearchPreviewDialog extends ConsumerWidget {
     );
   }
 
-  Widget _buildBlurb(BuildContext context, ThemeData theme) {
+  Widget _buildBlurb(BuildContext context, ThemeData theme, WidgetRef ref) {
     // 清理 blurb 中的 HTML 标签
     final cleanBlurb = post.blurb
         .replaceAll(RegExp(r'<[^>]*>'), '')
@@ -358,6 +358,7 @@ class SearchPreviewDialog extends ConsumerWidget {
 
     if (cleanBlurb.isEmpty) return const SizedBox.shrink();
 
+    final contentFontScale = ref.watch(preferencesProvider).contentFontScale;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -369,6 +370,7 @@ class SearchPreviewDialog extends ConsumerWidget {
         style: theme.textTheme.bodyMedium?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
           height: 1.6,
+          fontSize: (theme.textTheme.bodyMedium?.fontSize ?? 14) * contentFontScale,
         ),
         maxLines: 8,
         overflow: TextOverflow.ellipsis,

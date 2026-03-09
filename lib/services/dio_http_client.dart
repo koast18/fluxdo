@@ -25,10 +25,8 @@ class DioHttpClient extends http.BaseClient {
       'Accept': '*/*',
       'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
     },
-    // 图片/文件下载：宽松的并发和速率限制
-    maxConcurrent: 15,
-    maxPerWindow: 30,
-    windowDuration: const Duration(seconds: 3),
+    // 图片/文件下载走 CDN，不需要速率限制
+    maxConcurrent: null,
   );
 
   /// 获取底层 Dio 实例（用于需要直接访问的场景）

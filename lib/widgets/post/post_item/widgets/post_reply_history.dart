@@ -8,12 +8,14 @@ class PostReplyHistory extends StatelessWidget {
   final List<Post>? replyHistory;
   final ValueNotifier<bool> showReplyHistoryNotifier;
   final void Function(int postNumber)? onJumpToPost;
+  final double contentFontScale;
 
   const PostReplyHistory({
     super.key,
     required this.replyHistory,
     required this.showReplyHistoryNotifier,
     this.onJumpToPost,
+    this.contentFontScale = 1.0,
   });
 
   @override
@@ -121,7 +123,7 @@ class PostReplyHistory extends StatelessWidget {
                                   physics: const NeverScrollableScrollPhysics(),
                                   child: DiscourseHtmlContent(
                                     html: replyPost.cooked,
-                                    textStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 13, height: 1.4),
+                                    textStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 13 * contentFontScale, height: 1.4),
                                     compact: true,
                                   ),
                                 ),

@@ -213,9 +213,14 @@ class _TopicPreviewDialogState extends ConsumerState<TopicPreviewDialog> {
 
     if (_firstPostCooked != null && _firstPostCooked!.isNotEmpty && !_loadFailed) {
       // 加载成功：渲染主贴 HTML
+      final contentFontScale = ref.watch(preferencesProvider).contentFontScale;
       return DiscourseHtmlContent(
         html: _firstPostCooked!,
         compact: true,
+        textStyle: theme.textTheme.bodyMedium?.copyWith(
+          height: 1.5,
+          fontSize: (theme.textTheme.bodyMedium?.fontSize ?? 14) * contentFontScale,
+        ),
         onInternalLinkTap: (topicId, topicSlug, postNumber) {
           Navigator.of(context).pop();
           Navigator.of(context).push(
@@ -252,6 +257,7 @@ class _TopicPreviewDialogState extends ConsumerState<TopicPreviewDialog> {
 
     if (cleanExcerpt.isEmpty) return const SizedBox.shrink();
 
+    final contentFontScale = ref.watch(preferencesProvider).contentFontScale;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -263,6 +269,7 @@ class _TopicPreviewDialogState extends ConsumerState<TopicPreviewDialog> {
         style: theme.textTheme.bodyMedium?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
           height: 1.6,
+          fontSize: (theme.textTheme.bodyMedium?.fontSize ?? 14) * contentFontScale,
         ),
         maxLines: 8,
         overflow: TextOverflow.ellipsis,

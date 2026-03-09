@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../models/topic.dart';
 import '../../../../providers/discourse_providers.dart';
+import '../../../../providers/preferences_provider.dart';
 import 'package:dio/dio.dart';
 import '../../../../services/app_error_handler.dart';
 import '../../../../services/discourse/discourse_service.dart';
@@ -254,6 +255,7 @@ class _PostHeaderSectionState extends ConsumerState<PostHeaderSection> {
                     replyHistory: _replyHistory,
                     showReplyHistoryNotifier: _showReplyHistoryNotifier,
                     onJumpToPost: widget.onJumpToPost,
+                    contentFontScale: ref.watch(preferencesProvider).contentFontScale,
                   );
                 },
               ),

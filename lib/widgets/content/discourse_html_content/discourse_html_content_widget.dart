@@ -414,6 +414,10 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
 
         // img 垂直居中（与 Discourse 一致：img { vertical-align: middle }）
         if (element.localName == 'img') {
+          if (element.classes.contains('emoji')) {
+
+            return {'vertical-align': 'middle', 'width': 'auto', 'height': 'auto'};
+          }
           return {'vertical-align': 'middle'};
         }
 

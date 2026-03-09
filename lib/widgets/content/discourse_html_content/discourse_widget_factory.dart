@@ -75,22 +75,36 @@ class DiscourseWidgetFactory extends WidgetFactory {
 
     // 检查是否是显式的 emoji class
     final bool isEmoji = tree.element.classes.contains('emoji');
+    // 独立大表情：消息仅包含 emoji 时 Discourse 会添加 only-emoji class
+    final bool isOnlyEmoji = isEmoji && tree.element.classes.contains('only-emoji');
 
     // 获取 emoji title（用于 SelectableAdapter，使 emoji 可被选中）
     final String? emojiTitle = isEmoji
         ? (tree.element.attributes['title'] ?? tree.element.attributes['alt'])
         : null;
 
+    // 通过 CSS 继承链直接解析 emoji 的 1em 字号
+    // InheritanceResolvers 包含完整的 h1~h6、inline style 等继承信息
+    double? emojiFontSize;
+    if (isEmoji) {
+      try {
+        emojiFontSize = tree.inheritanceResolvers
+            .resolve(context)
+            .prepareTextStyle()
+            .fontSize;
+      } catch (_) {}
+    }
+
     // 普通 URL：直接构建 widget，无需 FutureBuilder
     if (!DiscourseImageUtils.isUploadUrl(url)) {
-      return _buildImageWidget(url, url, width, height, isEmoji, emojiTitle: emojiTitle);
+      return _buildImageWidget(url, url, width, height, isEmoji, isOnlyEmoji: isOnlyEmoji, emojiTitle: emojiTitle, emojiFontSize: emojiFontSize);
     }
 
     // upload:// 短链接：检查缓存
     if (DiscourseImageUtils.isUploadUrlCached(url)) {
       final resolvedUrl = DiscourseImageUtils.getCachedUploadUrl(url);
       if (resolvedUrl != null) {
-        return _buildImageWidget(resolvedUrl, url, width, height, isEmoji, emojiTitle: emojiTitle);
+        return _buildImageWidget(resolvedUrl, url, width, height, isEmoji, isOnlyEmoji: isOnlyEmoji, emojiTitle: emojiTitle, emojiFontSize: emojiFontSize);
       }
       // 解析失败的 URL，显示错误图标
       return Icon(
@@ -114,18 +128,18 @@ class DiscourseWidgetFactory extends WidgetFactory {
           );
         }
 
-        return _buildImageWidget(snapshot.data, url, width, height, isEmoji, emojiTitle: emojiTitle);
+        return _buildImageWidget(snapshot.data, url, width, height, isEmoji, isOnlyEmoji: isOnlyEmoji, emojiTitle: emojiTitle, emojiFontSize: emojiFontSize);
       },
     );
   }
 
   /// 构建图片 widget（从缓存或 FutureBuilder 调用）
-  Widget _buildImageWidget(String? resolvedUrl, String originalUrl, double? width, double? height, bool isEmoji, {String? emojiTitle}) {
+  Widget _buildImageWidget(String? resolvedUrl, String originalUrl, double? width, double? height, bool isEmoji, {bool isOnlyEmoji = false, String? emojiTitle, double? emojiFontSize}) {
     // 检查是否是 SVG（处理带查询参数的 URL）
     final isSvg = _isSvgUrl(resolvedUrl) || _isSvgUrl(originalUrl);
 
     if (isSvg && resolvedUrl != null) {
-      return _buildSvgWidget(resolvedUrl, width, height, isEmoji);
+      return _buildSvgWidget(resolvedUrl, width, height, isEmoji, isOnlyEmoji: isOnlyEmoji, emojiFontSize: emojiFontSize);
     }
 
     // 使用自定义的鉴权 ImageProvider（emoji 使用独立缓存池）
@@ -150,9 +164,13 @@ class DiscourseWidgetFactory extends WidgetFactory {
 
     return Builder(
       builder: (context) {
-        // 计算合适的 Emoji 尺寸
-        final double emojiSize = DefaultTextStyle.of(context).style.fontSize ?? 16.0;
-        final double displaySize = emojiSize * 1.2;
+        // 基准字号（1em，跟随 h1~h6、inline style 等缩放）
+        final double emojiBaseSize = emojiFontSize
+            ?? DefaultTextStyle.of(context).style.fontSize
+            ?? 16.0;
+        // only-emoji: 独立大表情 32dp（Discourse CSS: img.emoji.only-emoji { width: 32px; height: 32px }）
+        // 普通 emoji: 1em
+        final double displaySize = isOnlyEmoji ? 32.0 : emojiBaseSize;
 
         // 如果不是画廊图片（通常是 Emoji 或预览中的 upload:// 图片）
         if (!isGalleryImage || isEmoji) {
@@ -204,7 +222,10 @@ class DiscourseWidgetFactory extends WidgetFactory {
 
            if (isEmoji) {
              Widget emojiWidget = Container(
-               margin: const EdgeInsets.symmetric(horizontal: 2.0),
+               // only-emoji: 独立大表情添加垂直间距（Discourse CSS: margin: .5em 0）
+               margin: isOnlyEmoji
+                   ? EdgeInsets.symmetric(vertical: emojiBaseSize * 0.5, horizontal: 1.0)
+                   : const EdgeInsets.symmetric(horizontal: 2.0),
                child: imageWidget,
              );
              // 用 SelectableAdapter 包裹，使 emoji 参与文本选择
@@ -352,23 +373,31 @@ class DiscourseWidgetFactory extends WidgetFactory {
   ///
   /// 使用内存缓存避免每次 build 都重新执行 getSingleFile() 的 SQLite 查询。
   /// 缓存和 DiscourseWidgetFactory 实例同生命周期（跟随 DiscourseHtmlContent State）。
-  Widget _buildSvgWidget(String url, double? width, double? height, bool isEmoji) {
+  Widget _buildSvgWidget(String url, double? width, double? height, bool isEmoji, {bool isOnlyEmoji = false, double? emojiFontSize}) {
     return Builder(
       builder: (context) {
-        final emojiSize = (DefaultTextStyle.of(context).style.fontSize ?? 16.0) * 1.2;
+        // 基准字号（1em）
+        final emojiBaseSize = emojiFontSize
+            ?? DefaultTextStyle.of(context).style.fontSize
+            ?? 16.0;
+        // only-emoji: 独立大表情 32dp; 普通 emoji: 1em
+        final emojiSize = isOnlyEmoji ? 32.0 : emojiBaseSize;
 
         // 命中缓存则直接渲染
         final cached = _svgCache[url];
         if (cached != null) {
           if (isEmoji) {
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 2.0),
+            Widget svgEmoji = Container(
+              margin: isOnlyEmoji
+                  ? EdgeInsets.symmetric(vertical: emojiBaseSize * 0.5, horizontal: 1.0)
+                  : const EdgeInsets.symmetric(horizontal: 2.0),
               child: SizedBox(
                 width: emojiSize,
                 height: emojiSize,
                 child: SvgPicture.string(cached.content, fit: BoxFit.contain),
               ),
             );
+            return svgEmoji;
           }
           return SvgPicture.string(
             cached.content,

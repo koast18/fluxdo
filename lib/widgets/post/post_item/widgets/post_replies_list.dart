@@ -12,6 +12,7 @@ class PostRepliesList extends StatelessWidget {
   final ValueNotifier<bool> showRepliesNotifier;
   final VoidCallback onLoadMore;
   final void Function(int postNumber)? onJumpToPost;
+  final double contentFontScale;
 
   const PostRepliesList({
     super.key,
@@ -22,6 +23,7 @@ class PostRepliesList extends StatelessWidget {
     required this.showRepliesNotifier,
     required this.onLoadMore,
     this.onJumpToPost,
+    this.contentFontScale = 1.0,
   });
 
   @override
@@ -117,7 +119,7 @@ class PostRepliesList extends StatelessWidget {
                               IgnorePointer(
                                 child: DiscourseHtmlContent(
                                   html: reply.cooked,
-                                  textStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 13, height: 1.4),
+                                  textStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 13 * contentFontScale, height: 1.4),
                                   compact: true,
                                 ),
                               ),

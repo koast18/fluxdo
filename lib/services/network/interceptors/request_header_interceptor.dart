@@ -18,7 +18,13 @@ class RequestHeaderInterceptor extends Interceptor {
     // 1. 设置 User-Agent
     options.headers['User-Agent'] = await AppConstants.getUserAgent();
 
-    // 2. 设置 CSRF Token（无数据时传 "undefined"）
+    // 2. 注入 Client Hints 请求头（Sec-CH-UA 系列，仅移动端可用）
+    final hints = AppConstants.clientHints;
+    if (hints != null) {
+      options.headers.addAll(hints);
+    }
+
+    // 3. 设置 CSRF Token（无数据时传 "undefined"）
     final skipCsrf = options.extra['skipCsrf'] == true;
     if (!skipCsrf) {
       final csrf = _cookieSync.csrfToken;

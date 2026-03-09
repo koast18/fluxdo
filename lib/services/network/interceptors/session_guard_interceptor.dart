@@ -44,10 +44,11 @@ class SessionGuardInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    // 过期会话的错误直接 cancel 掉，不触发任何业务逻辑
+    // 过期会话的错误转为 cancel 类型，但仍需通过 next 传播，
+    // 确保后续拦截器（如 RequestSchedulerInterceptor）能正常释放资源
     final gen = err.requestOptions.extra['_sessionGeneration'] as int?;
     if (gen != null && !AuthSession().isValid(gen)) {
-      handler.reject(
+      handler.next(
         DioException(
           requestOptions: err.requestOptions,
           type: DioExceptionType.cancel,

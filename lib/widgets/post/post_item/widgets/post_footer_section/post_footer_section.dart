@@ -6,6 +6,7 @@ import '../../../../../constants.dart';
 import '../../../../../models/topic.dart';
 import '../../../../../modules/ldc_reward/ldc_reward.dart';
 import '../../../../../providers/discourse_providers.dart';
+import '../../../../../providers/preferences_provider.dart';
 import 'package:dio/dio.dart';
 import '../../../../../services/app_error_handler.dart';
 import '../../../../../services/discourse/discourse_service.dart';
@@ -160,6 +161,7 @@ class _PostFooterSectionState extends ConsumerState<PostFooterSection> {
                 showRepliesNotifier: _showRepliesNotifier,
                 onLoadMore: _loadReplies,
                 onJumpToPost: widget.onJumpToPost,
+                contentFontScale: ref.watch(preferencesProvider).contentFontScale,
               );
             },
           ),
