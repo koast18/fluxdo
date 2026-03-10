@@ -188,6 +188,31 @@ extension _UserActions on _TopicDetailPageState {
     }
   }
 
+  void _handleReadLater() {
+    final notifier = ref.read(readLaterProvider.notifier);
+    final detail = ref.read(topicDetailProvider(_params)).value;
+
+    if (notifier.contains(widget.topicId)) {
+      // 已在列表中 → 移除
+      notifier.remove(widget.topicId);
+      ToastService.showSuccess('已从浮窗移除');
+    } else {
+      // 不在列表中 → 添加
+      final item = ReadLaterItem(
+        topicId: widget.topicId,
+        title: detail?.title ?? widget.initialTitle ?? '',
+        scrollToPostNumber: _controller.currentPostNumber,
+        addedAt: DateTime.now(),
+      );
+      final success = notifier.add(item);
+      if (success) {
+        ToastService.showSuccess('已加入浮窗');
+      } else {
+        ToastService.showError('浮窗已满（最多 $maxReadLaterItems 个）');
+      }
+    }
+  }
+
   void _handleVoteChanged(int newVoteCount, bool userVoted) {
     final params = _params;
     ref.read(topicDetailProvider(params).notifier).updateTopicVote(newVoteCount, userVoted);

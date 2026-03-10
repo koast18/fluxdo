@@ -43,6 +43,8 @@ import '../../widgets/share/share_image_preview.dart';
 import '../../widgets/share/export_sheet.dart';
 import '../../widgets/bookmark/bookmark_edit_sheet.dart';
 import '../../widgets/search/topic_search_view.dart';
+import '../../providers/read_later_provider.dart';
+import '../../models/read_later_item.dart';
 import '../../providers/topic_search_provider.dart';
 import '../edit_topic_page.dart';
 import 'widgets/ai_chat_page.dart';
@@ -489,6 +491,8 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage> with WidgetsB
             _handleEditTopic();
           } else if (value == 'bookmark') {
             _handleBookmark(notifier);
+          } else if (value == 'read_later') {
+            _handleReadLater();
           }
         },
         itemBuilder: (context) => [
@@ -523,6 +527,28 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage> with WidgetsB
                 const SizedBox(width: 12),
                 Text(detail.bookmarked ? '编辑书签' : '添加书签'),
               ],
+            ),
+          ),
+          PopupMenuItem(
+            value: 'read_later',
+            child: Builder(
+              builder: (context) {
+                final isInReadLater = ref.read(readLaterProvider.notifier).contains(widget.topicId);
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isInReadLater ? Icons.layers : Icons.layers_outlined,
+                      size: 20,
+                      color: isInReadLater
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.onSurface,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(isInReadLater ? '移出浮窗' : '加入浮窗'),
+                  ],
+                );
+              },
             ),
           ),
           PopupMenuItem(

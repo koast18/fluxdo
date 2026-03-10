@@ -51,6 +51,8 @@ import 'widgets/preheat_gate.dart';
 import 'widgets/onboarding_gate.dart';
 import 'widgets/layout/adaptive_scaffold.dart';
 import 'widgets/layout/adaptive_navigation.dart';
+import 'widgets/read_later/read_later_bubble.dart';
+import 'providers/read_later_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -273,7 +275,12 @@ class MainApp extends ConsumerWidget {
                 // 关闭系统自动 scrim，实现完全沉浸
                 systemNavigationBarContrastEnforced: false,
               ),
-              child: child!,
+              child: Stack(
+                children: [
+                  child!,
+                  const ReadLaterBubble(),
+                ],
+              ),
             );
           },
           home: const OnboardingGate(
@@ -316,6 +323,8 @@ class _MainPageState extends ConsumerState<MainPage> with WidgetsBindingObserver
 
     // 设置导航 context（用于 CF 验证弹窗）
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 标记应用已就绪（MainPage 在 PreheatGate 之后才挂载）
+      ref.read(appReadyProvider.notifier).state = true;
       DiscourseService().setNavigatorContext(context);
       PreloadedDataService().setNavigatorContext(context);
 
