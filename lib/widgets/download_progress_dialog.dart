@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import 'package:paper_shaders/paper_shaders.dart';
+
 import '../services/apk_download_service.dart';
 import '../services/update_service.dart';
-import 'common/download_background.dart';
 
 /// 下载进度对话框
 class DownloadProgressDialog extends StatefulWidget {
@@ -95,8 +96,10 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
           height: dialogHeight,
           child: Stack(
             children: [
-              // 1. 动态背景 (唯一底色)
-              const Positioned.fill(child: DownloadBackground()),
+              // 1. MeshGradient 动态背景
+              Positioned.fill(
+                child: _buildMeshBackground(context),
+              ),
               
               // 2. 内容层
               Padding(
@@ -125,6 +128,21 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildMeshBackground(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return MeshGradient(
+      colors: [
+        colorScheme.primary,
+        colorScheme.secondary,
+        colorScheme.tertiary,
+        colorScheme.inversePrimary,
+      ],
+      distortion: 0.8,
+      swirl: 0.1,
+      speed: 1,
     );
   }
 

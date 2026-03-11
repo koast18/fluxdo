@@ -18,7 +18,7 @@ import '../services/app_error_handler.dart';
 import '../utils/share_utils.dart';
 import '../providers/preferences_provider.dart';
 import '../widgets/common/flair_badge.dart';
-import '../widgets/common/animated_gradient_background.dart';
+import '../widgets/common/grain_gradient_background.dart';
 import '../widgets/common/smart_avatar.dart';
 import '../widgets/content/discourse_html_content/discourse_html_content_widget.dart';
 import '../widgets/content/collapsed_html_content.dart';
@@ -830,8 +830,20 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
           return Stack(
             fit: StackFit.expand,
             children: [
-              // ===== 层 0: 背景 - 渐变动画打底 + 图片叠加 =====
-              const AnimatedGradientBackground(),
+              // ===== 层 0: 背景 - shader 动画 + 径向渐变辉光 + 图片叠加 =====
+              // 用 ClipRect 裁剪溢出，内部固定为 expandedHeight，防止收起时 shader 被压扁
+              Positioned.fill(
+                child: ClipRect(
+                  child: OverflowBox(
+                    alignment: Alignment.topCenter,
+                    maxHeight: expandedHeight,
+                    child: SizedBox(
+                      height: expandedHeight,
+                      child: const GrainGradientBackground(),
+                    ),
+                  ),
+                ),
+              ),
               if (hasBackground)
                 Image(
                   image: discourseImageProvider(

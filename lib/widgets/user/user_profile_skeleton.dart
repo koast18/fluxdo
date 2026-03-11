@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../common/animated_gradient_background.dart';
+import '../common/grain_gradient_background.dart';
 import '../common/skeleton.dart';
 
 /// 用户资料页骨架屏
@@ -84,8 +84,8 @@ class UserProfileSkeleton extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // 背景 - 使用流动渐变背景
-        const AnimatedGradientBackground(),
+        // 背景 - 使用 GrainGradient，与正式页面同款
+        const GrainGradientBackground(),
         // 压暗遮罩（与正式页面展开时一致）
         Container(color: Colors.black.withValues(alpha: 0.6)),
         // 内容
