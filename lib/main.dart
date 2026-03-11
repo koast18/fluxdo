@@ -276,6 +276,7 @@ class MainApp extends ConsumerWidget {
                 systemNavigationBarContrastEnforced: false,
               ),
               child: Stack(
+                fit: StackFit.passthrough,
                 children: [
                   child!,
                   const ReadLaterBubble(),
