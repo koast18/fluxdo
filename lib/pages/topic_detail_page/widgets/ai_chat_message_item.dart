@@ -7,29 +7,82 @@ import '../../../widgets/markdown_editor/markdown_renderer.dart';
 class AiChatMessageItem extends StatelessWidget {
   final AiChatMessage message;
   final VoidCallback? onRetry;
+  final VoidCallback? onShareAsImage;
+  final VoidCallback? onCopyText;
+
+  /// 多选模式相关
+  final bool selectionMode;
+  final bool isSelected;
+  final VoidCallback? onSelectionToggle;
 
   const AiChatMessageItem({
     super.key,
     required this.message,
     this.onRetry,
+    this.onShareAsImage,
+    this.onCopyText,
+    this.selectionMode = false,
+    this.isSelected = false,
+    this.onSelectionToggle,
   });
 
   @override
   Widget build(BuildContext context) {
     final isUser = message.role == ChatRole.user;
+
+    if (selectionMode) {
+      return _buildSelectableMessage(context, isUser);
+    }
+
     return isUser ? _buildUserMessage(context) : _buildAssistantMessage(context);
   }
 
-  Widget _buildUserMessage(BuildContext context) {
+  /// 多选模式下的消息
+  Widget _buildSelectableMessage(BuildContext context, bool isUser) {
+    return InkWell(
+      onTap: onSelectionToggle,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Checkbox(
+                value: isSelected,
+                onChanged: (_) => onSelectionToggle?.call(),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            Expanded(
+              child: Opacity(
+                opacity: isSelected ? 1.0 : 0.6,
+                child: isUser
+                    ? _buildUserMessage(context, inSelectionMode: true)
+                    : _buildAssistantMessage(context, inSelectionMode: true),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserMessage(BuildContext context, {bool inSelectionMode = false}) {
     final theme = Theme.of(context);
 
     return Align(
-      alignment: Alignment.centerRight,
+      alignment: inSelectionMode ? Alignment.centerLeft : Alignment.centerRight,
       child: Container(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.78,
+          maxWidth: inSelectionMode
+              ? double.infinity
+              : MediaQuery.of(context).size.width * 0.78,
         ),
-        margin: const EdgeInsets.only(left: 48, right: 16, top: 4, bottom: 4),
+        margin: inSelectionMode
+            ? const EdgeInsets.only(top: 4, bottom: 4)
+            : const EdgeInsets.only(left: 48, right: 16, top: 4, bottom: 4),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: theme.colorScheme.primaryContainer,
@@ -50,18 +103,25 @@ class AiChatMessageItem extends StatelessWidget {
     );
   }
 
-  Widget _buildAssistantMessage(BuildContext context) {
+  Widget _buildAssistantMessage(BuildContext context, {bool inSelectionMode = false}) {
     final theme = Theme.of(context);
     final isStreaming = message.status == MessageStatus.streaming;
     final isError = message.status == MessageStatus.error;
+    final isCompleted = message.status == MessageStatus.completed;
+    final hasContent = message.content.isNotEmpty;
+    final showActions = isCompleted && hasContent && !inSelectionMode;
 
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.85,
+          maxWidth: inSelectionMode
+              ? double.infinity
+              : MediaQuery.of(context).size.width * 0.85,
         ),
-        margin: const EdgeInsets.only(left: 16, right: 48, top: 4, bottom: 4),
+        margin: inSelectionMode
+            ? const EdgeInsets.only(top: 4, bottom: 4)
+            : const EdgeInsets.only(left: 16, right: 48, top: 4, bottom: 4),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerLow,
@@ -77,10 +137,8 @@ class AiChatMessageItem extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (isError && message.content.isEmpty) ...[
-              // 纯错误状态
               _buildErrorWidget(context),
             ] else ...[
-              // 正常内容或带内容的错误
               if (message.content.isNotEmpty)
                 MarkdownBody(data: '${message.content}${isStreaming ? ' ▊' : ''}'),
               if (message.content.isEmpty && isStreaming)
@@ -89,6 +147,11 @@ class AiChatMessageItem extends StatelessWidget {
                 const SizedBox(height: 8),
                 _buildErrorWidget(context),
               ],
+            ],
+            // 操作按钮行
+            if (showActions) ...[
+              const SizedBox(height: 8),
+              _buildActionBar(context),
             ],
           ],
         ),
@@ -150,6 +213,68 @@ class AiChatMessageItem extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+
+  /// 操作按钮行
+  Widget _buildActionBar(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.onSurfaceVariant;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _ActionButton(
+          icon: Icons.image_outlined,
+          label: '导出图片',
+          color: color,
+          onTap: onShareAsImage,
+        ),
+        const SizedBox(width: 12),
+        _ActionButton(
+          icon: Icons.copy_outlined,
+          label: '复制',
+          color: color,
+          onTap: onCopyText,
+        ),
+      ],
+    );
+  }
+}
+
+/// 紧凑的操作按钮
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 3),
+            Text(
+              label,
+              style: TextStyle(fontSize: 11, color: color),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

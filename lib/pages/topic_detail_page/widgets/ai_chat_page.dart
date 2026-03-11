@@ -2,10 +2,13 @@ import 'dart:async';
 
 import 'package:ai_model_manager/ai_model_manager.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/topic.dart';
 import '../../../services/discourse/discourse_service.dart';
+import '../../../services/toast_service.dart';
+import '../../../widgets/share/ai_share_image_preview.dart';
 import 'ai_chat_input.dart';
 import 'ai_chat_message_item.dart';
 import 'ai_context_selector.dart';
@@ -18,11 +21,15 @@ class AiChatPage extends ConsumerStatefulWidget {
   /// 状态栏高度（从父 context 传入，modal 内部会清零 padding.top）
   final double topPadding;
 
+  /// 回复话题回调（将 AI 回复内容预填到回复框）
+  final void Function(String content)? onReplyToTopic;
+
   const AiChatPage({
     super.key,
     required this.topicId,
     required this.topPadding,
     this.detail,
+    this.onReplyToTopic,
   });
 
   @override
@@ -41,6 +48,10 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
 
   /// 上一次加载使用的 scope，用于检测变化
   ContextScope? _lastLoadedScope;
+
+  /// 多选模式
+  bool _selectionMode = false;
+  final Set<String> _selectedMessageIds = {};
 
   @override
   void didUpdateWidget(AiChatPage oldWidget) {
@@ -195,6 +206,86 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
     );
   }
 
+  /// 获取话题标题
+  String get _topicTitle => widget.detail?.title ?? '';
+
+  /// 获取话题 slug
+  String? get _topicSlug => widget.detail?.slug;
+
+  /// 进入多选模式
+  void _enterSelectionMode() {
+    setState(() {
+      _selectionMode = true;
+      _selectedMessageIds.clear();
+    });
+  }
+
+  /// 退出多选模式
+  void _exitSelectionMode() {
+    setState(() {
+      _selectionMode = false;
+      _selectedMessageIds.clear();
+    });
+  }
+
+  /// 切换消息选中状态
+  void _toggleMessageSelection(String messageId) {
+    setState(() {
+      if (_selectedMessageIds.contains(messageId)) {
+        _selectedMessageIds.remove(messageId);
+      } else {
+        _selectedMessageIds.add(messageId);
+      }
+    });
+  }
+
+  /// 导出选中的消息为图片
+  void _exportSelectedMessages() {
+    final chatState = ref.read(topicAiChatProvider(widget.topicId));
+    final selectedMessages = chatState.messages
+        .where((m) => _selectedMessageIds.contains(m.id))
+        .toList();
+
+    if (selectedMessages.isEmpty) {
+      ToastService.show('请选择要导出的消息');
+      return;
+    }
+
+    _exitSelectionMode();
+
+    AiShareImagePreview.showMessages(
+      context,
+      messages: selectedMessages,
+      topicTitle: _topicTitle,
+      topicId: widget.topicId,
+      topicSlug: _topicSlug,
+      onReplyToTopic: _onReplyImageReady,
+    );
+  }
+
+  /// 单条消息导出图片
+  void _shareMessageAsImage(AiChatMessage message) {
+    AiShareImagePreview.show(
+      context,
+      message: message,
+      topicTitle: _topicTitle,
+      topicId: widget.topicId,
+      topicSlug: _topicSlug,
+      onReplyToTopic: _onReplyImageReady,
+    );
+  }
+
+  /// 复制消息文本
+  void _copyMessageText(AiChatMessage message) {
+    Clipboard.setData(ClipboardData(text: message.content));
+    ToastService.showSuccess('已复制到剪贴板');
+  }
+
+  /// 预览页上传完成后的回调
+  void _onReplyImageReady(String imageMarkdown) {
+    widget.onReplyToTopic?.call(imageMarkdown);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -245,69 +336,78 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
               // 自定义标题栏
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.auto_awesome,
-                          size: 20,
-                          color: theme.colorScheme.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'AI 助手',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
+                child: _selectionMode
+                    ? _buildSelectionToolbar(context, theme)
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.auto_awesome,
+                                size: 20,
+                                color: theme.colorScheme.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'AI 助手',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Consumer(
-                          builder: (context, ref, _) {
-                            final scope = ref.watch(
-                              topicAiContextScopeProvider(widget.topicId),
-                            );
-                            return AiContextSelector(
-                              currentScope: scope,
-                              onChanged: _onScopeChanged,
-                            );
-                          },
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.add_comment_outlined),
-                          tooltip: '新建会话',
-                          iconSize: 20,
-                          onPressed: () {
-                            chatNotifier.createNewSession();
-                          },
-                        ),
-                        if (chatState.sessions.isNotEmpty)
-                          IconButton(
-                            icon: const Icon(Icons.history),
-                            tooltip: '会话记录',
-                            iconSize: 20,
-                            onPressed: () => _showSessionHistory(
-                                context, chatState, chatNotifier),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Consumer(
+                                builder: (context, ref, _) {
+                                  final scope = ref.watch(
+                                    topicAiContextScopeProvider(widget.topicId),
+                                  );
+                                  return AiContextSelector(
+                                    currentScope: scope,
+                                    onChanged: _onScopeChanged,
+                                  );
+                                },
+                              ),
+                              if (chatState.messages.isNotEmpty)
+                                IconButton(
+                                  icon: const Icon(Icons.check_box_outlined),
+                                  tooltip: '多选导出',
+                                  iconSize: 20,
+                                  onPressed: _enterSelectionMode,
+                                ),
+                              IconButton(
+                                icon: const Icon(Icons.add_comment_outlined),
+                                tooltip: '新建会话',
+                                iconSize: 20,
+                                onPressed: () {
+                                  chatNotifier.createNewSession();
+                                },
+                              ),
+                              if (chatState.sessions.isNotEmpty)
+                                IconButton(
+                                  icon: const Icon(Icons.history),
+                                  tooltip: '会话记录',
+                                  iconSize: 20,
+                                  onPressed: () => _showSessionHistory(
+                                      context, chatState, chatNotifier),
+                                ),
+                              if (chatState.messages.isNotEmpty)
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline),
+                                  tooltip: '清空聊天',
+                                  iconSize: 20,
+                                  onPressed: () =>
+                                      _confirmClear(context, chatNotifier),
+                                ),
+                            ],
                           ),
-                        if (chatState.messages.isNotEmpty)
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline),
-                            tooltip: '清空聊天',
-                            iconSize: 20,
-                            onPressed: () =>
-                                _confirmClear(context, chatNotifier),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
+                        ],
+                      ),
               ),
               const SizedBox(height: 8),
 
@@ -475,8 +575,58 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
                       .retryLastMessage(scope, selectedModel: model);
                 }
               : null,
+          onShareAsImage: message.status == MessageStatus.completed &&
+                  message.content.isNotEmpty
+              ? () => _shareMessageAsImage(message)
+              : null,
+          onCopyText: message.status == MessageStatus.completed &&
+                  message.content.isNotEmpty
+              ? () => _copyMessageText(message)
+              : null,
+          selectionMode: _selectionMode,
+          isSelected: _selectedMessageIds.contains(message.id),
+          onSelectionToggle: _selectionMode
+              ? () => _toggleMessageSelection(message.id)
+              : null,
         );
       },
+    );
+  }
+
+  /// 多选模式工具栏
+  Widget _buildSelectionToolbar(BuildContext context, ThemeData theme) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.close),
+              iconSize: 20,
+              onPressed: _exitSelectionMode,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '已选 ${_selectedMessageIds.length} 条',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        FilledButton.icon(
+          onPressed: _selectedMessageIds.isEmpty
+              ? null
+              : _exportSelectedMessages,
+          icon: const Icon(Icons.image_outlined, size: 18),
+          label: const Text('导出图片'),
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          ),
+        ),
+      ],
     );
   }
 

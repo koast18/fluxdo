@@ -752,10 +752,21 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage> with WidgetsB
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => AiChatPage(
+      builder: (sheetContext) => AiChatPage(
         topicId: widget.topicId,
         detail: detail,
         topPadding: topPadding,
+        onReplyToTopic: (imageMarkdown) {
+          // 关闭 AI Sheet（预览页已在内部自行关闭）
+          Navigator.pop(sheetContext);
+          // 打开回复框，预填上传后的图片 markdown
+          showReplySheet(
+            context: context,
+            topicId: widget.topicId,
+            categoryId: detail.categoryId,
+            initialContent: '$imageMarkdown\n',
+          );
+        },
       ),
     );
   }
