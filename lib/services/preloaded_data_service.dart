@@ -38,6 +38,8 @@ class PreloadedDataService {
   String? _sharedSessionKey;  // MessageBus 跨域认证 key
   String? _longPollingBaseUrl;  // MessageBus 独立域名
   String? _cdnUrl;  // CDN 域名（从 data-discourse-setup 提取）
+  String? _s3CdnUrl;  // S3 CDN 域名（如 https://cdn3.linux.do）
+  String? _s3BaseUrl;  // S3 基础 URL（如 //linuxdo-uploads.s3.linux.do）
   bool _loaded = false;
   bool _loading = false;
 
@@ -244,6 +246,12 @@ class PreloadedDataService {
   /// 获取 CDN URL（如 https://cdn.linux.do）
   String? get cdnUrl => _cdnUrl;
 
+  /// 获取 S3 CDN URL（如 https://cdn3.linux.do）
+  String? get s3CdnUrl => _s3CdnUrl;
+
+  /// 获取 S3 基础 URL（如 //linuxdo-uploads.s3.linux.do）
+  String? get s3BaseUrl => _s3BaseUrl;
+
   /// 获取 MessageBus 频道的初始 message ID
   /// 返回格式: {'/latest': 6855147, '/new': 104155, ...}
   Future<Map<String, dynamic>?> getTopicTrackingStateMeta() async {
@@ -334,6 +342,8 @@ class PreloadedDataService {
     _sharedSessionKey = null;
     _longPollingBaseUrl = null;
     _cdnUrl = null;
+    _s3CdnUrl = null;
+    _s3BaseUrl = null;
     await _loadPreloadedData();
   }
 
@@ -353,6 +363,8 @@ class PreloadedDataService {
     _sharedSessionKey = null;
     _longPollingBaseUrl = null;
     _cdnUrl = null;
+    _s3CdnUrl = null;
+    _s3BaseUrl = null;
   }
 
   /// 确保数据已加载
@@ -462,20 +474,30 @@ class PreloadedDataService {
     }
   }
 
-  /// 从 HTML 中提取 CDN URL（data-discourse-setup meta 标签的 data-cdn 属性）
+  /// 从 HTML 中提取 CDN 配置（data-discourse-setup meta 标签）
   void _extractCdnUrlFromHtml(String html) {
-    // 匹配 <meta id="data-discourse-setup" ... data-cdn="https://cdn.linux.do" ...>
-    final match = RegExp(
-      r'''id=["']data-discourse-setup["'][^>]*\bdata-cdn=["']([^"']+)["']''',
+    // 找到 data-discourse-setup 标签的完整内容
+    final tagMatch = RegExp(
+      r'''id=["']data-discourse-setup["'][^>]*>''',
       caseSensitive: false,
     ).firstMatch(html);
-    if (match == null) return;
-    final cdn = match.group(1);
-    if (cdn != null && cdn.isNotEmpty) {
-      // 移除末尾斜杠
-      _cdnUrl = cdn.endsWith('/') ? cdn.substring(0, cdn.length - 1) : cdn;
-      debugPrint('[PreloadedData] cdnUrl: $_cdnUrl');
+    if (tagMatch == null) return;
+    final tag = tagMatch.group(0)!;
+
+    String? extractAttr(String attrName) {
+      final m = RegExp('''data-$attrName=["']([^"']+)["']''').firstMatch(tag);
+      if (m == null) return null;
+      final v = m.group(1);
+      if (v == null || v.isEmpty) return null;
+      return v.endsWith('/') ? v.substring(0, v.length - 1) : v;
     }
+
+    _cdnUrl = extractAttr('cdn');
+    _s3CdnUrl = extractAttr('s3-cdn');
+    _s3BaseUrl = extractAttr('s3-base-url');
+
+    if (_cdnUrl != null) debugPrint('[PreloadedData] cdnUrl: $_cdnUrl');
+    if (_s3CdnUrl != null) debugPrint('[PreloadedData] s3CdnUrl: $_s3CdnUrl, s3BaseUrl: $_s3BaseUrl');
   }
 
   /// 解析预加载数据字符串

@@ -280,7 +280,6 @@ class BadgeUser {
   }
 
   String getAvatarUrl({int size = 96}) {
-    // 优先使用动画头像
     if (animatedAvatar != null && animatedAvatar!.isNotEmpty) {
       return UrlHelper.resolveUrl(animatedAvatar!);
     }

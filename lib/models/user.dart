@@ -8,7 +8,7 @@ class User {
   final String username;
   final String? name;
   final String? avatarTemplate;
-  final String? animatedAvatar; // 动画头像（GIF）
+  final String? animatedAvatar;
   final int trustLevel;
   final String? bio;
   final String? bioCooked;
@@ -273,7 +273,6 @@ class User {
   
   /// 获取头像 URL，优先使用动画头像（GIF）
   String getAvatarUrl({int size = 120}) {
-    // 优先使用动画头像
     if (animatedAvatar != null && animatedAvatar!.isNotEmpty) {
       return UrlHelper.resolveUrl(animatedAvatar!);
     }
