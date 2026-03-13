@@ -354,8 +354,10 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
     final hasLocation = _user!.location != null && _user!.location!.isNotEmpty;
     final hasWebsite = _user!.website != null && _user!.website!.isNotEmpty;
     final hasJoinedAt = _user!.createdAt != null;
+    final isSuspended = _user!.isSuspended;
+    final isSilenced = _user!.isSilenced;
 
-    if (!hasBio && !hasLocation && !hasWebsite && !hasJoinedAt) return;
+    if (!hasBio && !hasLocation && !hasWebsite && !hasJoinedAt && !isSuspended && !isSilenced) return;
 
     showModalBottomSheet(
       context: context,
@@ -392,7 +394,7 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                
+
                 // 标题栏
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 4, 24, 16),
@@ -405,18 +407,41 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
                         ),
                       ),
                       const Spacer(),
-                      // 如果需要可以添加右上角操作按钮
                     ],
                   ),
                 ),
                 const Divider(height: 1, indent: 16, endIndent: 16),
-                
+
                 // 内容
                 Expanded(
                   child: ListView(
                     controller: scrollController,
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
                     children: [
+                      // 封禁/禁言状态
+                      if (isSuspended)
+                        _buildRestrictionSection(
+                          theme,
+                          icon: Icons.block_rounded,
+                          title: '封禁状态',
+                          label: _user!.isSuspendedForever
+                              ? '该用户已被永久封禁'
+                              : '封禁至 ${TimeUtils.formatFullDate(_user!.suspendedTill)}',
+                          reason: _user!.suspendReason,
+                          color: theme.colorScheme.error,
+                        ),
+                      if (isSilenced)
+                        _buildRestrictionSection(
+                          theme,
+                          icon: Icons.mic_off_rounded,
+                          title: '禁言状态',
+                          label: _user!.isSilencedForever
+                              ? '该用户已被永久禁言'
+                              : '禁言至 ${TimeUtils.formatFullDate(_user!.silencedTill)}',
+                          reason: _user!.silenceReason,
+                          color: Colors.orange,
+                        ),
+
                       // 个人简介
                       if (hasBio) ...[
                         Text(
@@ -446,7 +471,7 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
                           ),
                         ),
                         const SizedBox(height: 16),
-                        
+
                         if (hasLocation)
                           _buildInfoRow(
                             context,
@@ -454,7 +479,7 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
                             '位置',
                             _user!.location!,
                           ),
-                        
+
                         if (hasWebsite)
                           _buildInfoRow(
                             context,
@@ -464,7 +489,7 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
                             url: _user!.website,
                             isLink: true,
                           ),
-                        
+
                         if (hasJoinedAt)
                           _buildInfoRow(
                             context,
@@ -480,6 +505,72 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
             ),
           );
         },
+      ),
+    );
+  }
+
+  /// 关于弹窗中的封禁/禁言区块
+  Widget _buildRestrictionSection(
+    ThemeData theme, {
+    required IconData icon,
+    required String title,
+    required String label,
+    required String? reason,
+    required Color color,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: color.withValues(alpha: 0.2)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(icon, size: 18, color: color),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (reason != null && reason.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    reason,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -717,6 +808,8 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
           icon: const Icon(Icons.more_vert),
           onSelected: (value) {
             switch (value) {
+              case 'about':
+                _showUserInfo();
               case 'share':
                 _shareUser();
               case 'level_normal':
@@ -730,6 +823,16 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
           itemBuilder: (context) {
             final theme = Theme.of(context);
             return [
+              PopupMenuItem<String>(
+                value: 'about',
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 20, color: theme.colorScheme.onSurface),
+                    const SizedBox(width: 12),
+                    const Text('关于'),
+                  ],
+                ),
+              ),
               PopupMenuItem<String>(
                 value: 'share',
                 child: Row(
@@ -1000,55 +1103,90 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
                         ],
                       ),
                       const SizedBox(height: 16),
-                      // Status / Signature (始终显示，保持布局一致)
-                      const SizedBox(height: 12),
-                      GestureDetector(
-                        onTap: hasInfo ? _showUserInfo : null,
-                        child: Container(
-                          height: 54,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha:0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
+                      // 封禁/禁言状态 与 个人简介 互斥显示（与 Discourse 前端一致）
+                      if (_user!.isSuspended || _user!.isSilenced) ...[
+                        GestureDetector(
+                          onTap: _showUserInfo,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: hasBio
-                                    ? CollapsedHtmlContent(
-                                        html: _user!.bio!,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        textStyle: TextStyle(
-                                          color: Colors.white.withValues(alpha:0.9),
-                                          fontSize: 14,
-                                          height: 1.3,
-                                        ),
-                                      )
-                                    : Text(
-                                        '这个人很懒，什么都没写',
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.white.withValues(alpha:0.5),
-                                          fontSize: 14,
-                                          height: 1.3,
-                                          fontStyle: FontStyle.italic,
-                                        ),
-                                      ),
-                              ),
-                              if (hasInfo) ...[
-                                const SizedBox(width: 8),
-                                Icon(
-                                  Icons.chevron_right,
-                                  size: 16,
-                                  color: Colors.white.withValues(alpha:0.6),
+                              // 封禁提示
+                              if (_user!.isSuspended) ...[
+                                _buildRestrictionBanner(
+                                  icon: Icons.block_rounded,
+                                  label: _user!.isSuspendedForever
+                                      ? '该用户已被永久封禁'
+                                      : '该用户已被封禁至 ${TimeUtils.formatFullDate(_user!.suspendedTill)}',
+                                  reason: _user!.suspendReason,
+                                  color: Colors.redAccent,
                                 ),
+                                if (_user!.isSilenced)
+                                  const SizedBox(height: 8),
                               ],
+                              // 禁言提示
+                              if (_user!.isSilenced)
+                                _buildRestrictionBanner(
+                                  icon: Icons.mic_off_rounded,
+                                  label: _user!.isSilencedForever
+                                      ? '该用户已被永久禁言'
+                                      : '该用户已被禁言至 ${TimeUtils.formatFullDate(_user!.silencedTill)}',
+                                  reason: _user!.silenceReason,
+                                  color: Colors.orangeAccent,
+                                ),
                             ],
                           ),
                         ),
-                      ),
+                      ] else ...[
+                        // 个人简介（非封禁/禁言状态时显示）
+                        const SizedBox(height: 12),
+                        GestureDetector(
+                          onTap: hasInfo ? _showUserInfo : null,
+                          child: Container(
+                            height: 54,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha:0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: hasBio
+                                      ? CollapsedHtmlContent(
+                                          html: _user!.bio!,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          textStyle: TextStyle(
+                                            color: Colors.white.withValues(alpha:0.9),
+                                            fontSize: 14,
+                                            height: 1.3,
+                                          ),
+                                        )
+                                      : Text(
+                                          '这个人很懒，什么都没写',
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: Colors.white.withValues(alpha:0.5),
+                                            fontSize: 14,
+                                            height: 1.3,
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                        ),
+                                ),
+                                if (hasInfo) ...[
+                                  const SizedBox(width: 8),
+                                  Icon(
+                                    Icons.chevron_right,
+                                    size: 16,
+                                    color: Colors.white.withValues(alpha:0.6),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
 
                       // Stats
                       const SizedBox(height: 16),
@@ -1259,6 +1397,56 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
               textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
             ),
           );
+  }
+
+  Widget _buildRestrictionBanner({
+    required IconData icon,
+    required String label,
+    required String? reason,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (reason != null && reason.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              reason,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.8),
+                fontSize: 12,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Widget _buildStatusEmoji(UserStatus status) {

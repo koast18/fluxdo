@@ -62,6 +62,12 @@ class User {
   final bool? canMuteUser;     // 是否可以静音
   final bool? canIgnoreUser;   // 是否可以忽略
 
+  // 封禁/禁言相关
+  final String? suspendReason;    // 封禁原因
+  final DateTime? suspendedTill;  // 封禁截止时间
+  final String? silenceReason;    // 禁言原因
+  final DateTime? silencedTill;   // 禁言截止时间
+
 
   User({
     required this.id,
@@ -103,6 +109,10 @@ class User {
     this.ignored,
     this.canMuteUser,
     this.canIgnoreUser,
+    this.suspendReason,
+    this.suspendedTill,
+    this.silenceReason,
+    this.silencedTill,
   });
 
   User copyWith({
@@ -157,6 +167,10 @@ class User {
       ignored: ignored ?? this.ignored,
       canMuteUser: canMuteUser,
       canIgnoreUser: canIgnoreUser,
+      suspendReason: suspendReason,
+      suspendedTill: suspendedTill,
+      silenceReason: silenceReason,
+      silencedTill: silencedTill,
     );
   }
 
@@ -213,6 +227,10 @@ class User {
       ignored: json['ignored'] as bool?,
       canMuteUser: json['can_mute_user'] as bool?,
       canIgnoreUser: json['can_ignore_user'] as bool?,
+      suspendReason: json['suspend_reason'] as String?,
+      suspendedTill: TimeUtils.parseUtcTime(json['suspended_till'] as String?),
+      silenceReason: json['silence_reason'] as String?,
+      silencedTill: TimeUtils.parseUtcTime(json['silenced_till'] as String?),
     );
   }
 
@@ -249,6 +267,20 @@ class User {
       gamificationScore: json['gamification_score'] as int?,
     );
   }
+
+  /// 是否被封禁（suspended_till 在当前时间之后）
+  bool get isSuspended => suspendedTill != null && suspendedTill!.isAfter(DateTime.now());
+
+  /// 是否被永久封禁（超过 100 年）
+  bool get isSuspendedForever => suspendedTill != null &&
+      suspendedTill!.difference(DateTime.now()).inDays > 36500;
+
+  /// 是否被禁言（silenced_till 在当前时间之后）
+  bool get isSilenced => silencedTill != null && silencedTill!.isAfter(DateTime.now());
+
+  /// 是否被永久禁言（超过 100 年）
+  bool get isSilencedForever => silencedTill != null &&
+      silencedTill!.difference(DateTime.now()).inDays > 36500;
 
   /// 获取背景图 URL（优先 profile，其次 card）
   String? get backgroundUrl => profileBackgroundUploadUrl ?? cardBackgroundUploadUrl;
