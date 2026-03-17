@@ -20,12 +20,11 @@ class BackgroundNotificationService {
   BackgroundNotificationService._internal();
 
   bool _enabled = false;
+  bool _androidInited = false;
 
   /// 初始化（在 main() 中调用一次）
   Future<void> initialize() async {
-    if (Platform.isAndroid) {
-      _initAndroidForegroundTask();
-    } else if (Platform.isIOS) {
+    if (Platform.isIOS) {
       await _initIOSWorkmanager();
     }
   }
@@ -87,6 +86,12 @@ class BackgroundNotificationService {
   }
 
   Future<void> _startAndroidForegroundService() async {
+    // 延迟到首次启动服务时初始化，此时 navigatorKey.currentContext 已可用
+    if (!_androidInited) {
+      _androidInited = true;
+      _initAndroidForegroundTask();
+    }
+
     final serviceRunning = await FlutterForegroundTask.isRunningService;
     if (serviceRunning) {
       debugPrint('[BackgroundNotification] Android 前台服务已在运行');
