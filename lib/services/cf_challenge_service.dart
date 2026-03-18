@@ -184,10 +184,25 @@ class CfChallengeService {
     final backupCfClearance = await cookieJarService.getCfClearanceCookie();
 
     // Dio 请求已经 403，说明当前 cf_clearance 可能失效了。
-    // 在同步到 WebView 前删除它，否则 WebView 带着旧 cf_clearance 访问
-    // /challenge 时 CF 会直接放行，导致验证被跳过。
+    // 必须确保 WebView 中也没有旧的 cf_clearance，否则 CF 直接放行不显示盾。
+    // 1. 先从 CookieJar 删除
     await cookieJarService.deleteCookie('cf_clearance');
+    // 2. 同步到 WebView（此时 CookieJar 中已无 cf_clearance）
     await cookieJarService.syncToWebView();
+    // 3. 双重保障：直接从 WebView 中删除 cf_clearance
+    //    避免 syncToWebView 的竞态导致旧值残留
+    await CookieManager.instance().deleteCookie(
+      url: WebUri(AppConstants.baseUrl),
+      name: 'cf_clearance',
+      path: '/',
+    );
+    // 同时删除带前导点 domain 的变体
+    await CookieManager.instance().deleteCookie(
+      url: WebUri(AppConstants.baseUrl),
+      name: 'cf_clearance',
+      domain: '.${Uri.parse(AppConstants.baseUrl).host}',
+      path: '/',
+    );
     if (!overlayState.mounted) {
       debugPrint('[CfChallenge] Overlay no longer mounted');
       CfChallengeLogger.log('[VERIFY] Overlay not mounted');

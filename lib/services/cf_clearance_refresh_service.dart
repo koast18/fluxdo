@@ -37,6 +37,9 @@ class CfClearanceRefreshService {
   /// 连续失败次数
   int _consecutiveFailures = 0;
 
+  /// 代际计数器：每次 start/stop 递增，用于使异步回调中的过期操作失效
+  int _generation = 0;
+
   /// 最大连续失败次数
   static const int _maxConsecutiveFailures = 3;
 
@@ -80,6 +83,7 @@ class CfClearanceRefreshService {
   void start() {
     if (_isRunning) return;
     _consecutiveFailures = 0;
+    _generation++;
     _startWebView();
   }
 
@@ -100,6 +104,7 @@ class CfClearanceRefreshService {
 
   /// 停止服务
   void stop() {
+    _generation++;
     _disposeWebView();
     _consecutiveFailures = 0;
     CfChallengeLogger.log('[CfRefresh] 服务已停止');
@@ -117,7 +122,10 @@ class CfClearanceRefreshService {
     }
 
     // 需要有 cf_clearance 才启动（说明已通过 CF 验证）
+    final gen = _generation;
     CookieJarService().getCfClearanceCookie().then((cookie) {
+      // stop() 或新一轮 start() 已被调用，放弃本次启动
+      if (gen != _generation) return;
       if (cookie == null) {
         CfChallengeLogger.log('[CfRefresh] 无 cf_clearance，跳过启动');
         return;
@@ -193,6 +201,7 @@ class CfClearanceRefreshService {
       initialTimer = Timer(_initialTimeout, () {
         CfChallengeLogger.log('[CfRefresh] 首次解题超时');
         _consecutiveFailures++;
+        _checkAndStopIfNeeded();
       });
     } catch (e) {
       debugPrint('[CfRefresh] WebView 启动失败: $e');
@@ -247,6 +256,7 @@ class CfClearanceRefreshService {
   Future<void> _callRcEndpoint(
       String id, String chlId, String? secondaryToken, String sitekey) async {
     _isCallingRc = true;
+    final gen = _generation;
     try {
       final dio = DiscourseDio.create(
         enableCfChallenge: false,
@@ -274,12 +284,19 @@ class CfClearanceRefreshService {
         ),
       );
 
+      // 请求期间服务已被停止，丢弃结果
+      if (gen != _generation) return;
+
       final statusCode = response.statusCode ?? 500;
       final body = response.data?.toString() ?? '{}';
       CfChallengeLogger.log('[CfRefresh] rc 端点响应: $statusCode');
 
       // 将真实响应回传给 JS 的 pending Promise
       _resolveRcPromise(id, statusCode, body);
+
+      // 等待 cookie 持久化完成后再检查
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (gen != _generation) return;
 
       // 验证 cf_clearance 是否已更新
       final cfClearance = await CookieJarService().getCfClearance();
@@ -293,6 +310,7 @@ class CfClearanceRefreshService {
         _checkAndStopIfNeeded();
       }
     } catch (e) {
+      if (gen != _generation) return;
       CfChallengeLogger.log('[CfRefresh] rc 端点调用异常: $e');
       _resolveRcPromise(id, 500, '{}');
       _consecutiveFailures++;
