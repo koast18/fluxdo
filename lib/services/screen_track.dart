@@ -5,11 +5,13 @@ import 'discourse/discourse_service.dart';
 /// [topicId] 话题 ID
 /// [postNumbers] 已上报的帖子编号集合
 /// [highestSeen] 最高已读帖子编号
-typedef OnTimingsSent = void Function(int topicId, Set<int> postNumbers, int highestSeen);
+typedef OnTimingsSent =
+    void Function(int topicId, Set<int> postNumbers, int highestSeen);
 
 /// 帖子浏览时间追踪服务
 class ScreenTrack {
   static const _flushInterval = Duration(seconds: 60);
+  static const _minRushFlushInterval = Duration(seconds: 3);
   static const _tickInterval = Duration(seconds: 1);
   static const _pauseUnlessScrolled = Duration(minutes: 3);
   static const _maxTrackingTime = Duration(minutes: 6);
@@ -107,12 +109,15 @@ class ScreenTrack {
     _lastTick = now;
 
     // 检查是否需要立即上报（有新的未上报帖子）
-    final rush = _timings.entries.any((e) =>
-        e.value > 0 &&
-        !_totalTimings.containsKey(e.key) &&
-        !_readPosts.contains(e.key));
+    final rush = _timings.entries.any(
+      (e) =>
+          e.value > 0 &&
+          !_totalTimings.containsKey(e.key) &&
+          !_readPosts.contains(e.key),
+    );
 
-    if (!_inProgress && (_lastFlush > _flushInterval || rush)) {
+    final shouldRushFlush = rush && _lastFlush >= _minRushFlushInterval;
+    if (!_inProgress && (_lastFlush > _flushInterval || shouldRushFlush)) {
       _flush();
     }
 
@@ -149,7 +154,10 @@ class ScreenTrack {
       _timings[postNumber] = 0;
     }
 
-    final highestSeen = newTimings.keys.fold<int>(0, (max, v) => v > max ? v : max);
+    final highestSeen = newTimings.keys.fold<int>(
+      0,
+      (max, v) => v > max ? v : max,
+    );
 
     if (highestSeen > 0) {
       if (_service.isAuthenticated) {
@@ -163,12 +171,15 @@ class ScreenTrack {
   }
 
   void _consolidateTimings(Map<int, int> timings, int topicTime, int topicId) {
-    final existingIndex = _consolidatedTimings.indexWhere((t) => t.topicId == topicId);
+    final existingIndex = _consolidatedTimings.indexWhere(
+      (t) => t.topicId == topicId,
+    );
     if (existingIndex != -1) {
       final existing = _consolidatedTimings[existingIndex];
       existing.topicTime += topicTime;
       timings.forEach((postNumber, time) {
-        existing.timings[postNumber] = (existing.timings[postNumber] ?? 0) + time;
+        existing.timings[postNumber] =
+            (existing.timings[postNumber] ?? 0) + time;
       });
     } else {
       _consolidatedTimings.add(
@@ -185,7 +196,8 @@ class ScreenTrack {
     if (_consolidatedTimings.isEmpty) return;
     if (_inProgress) return;
     if (!_service.isAuthenticated) return;
-    if (_blockSendingUntil != null && _blockSendingUntil!.isAfter(DateTime.now())) {
+    if (_blockSendingUntil != null &&
+        _blockSendingUntil!.isAfter(DateTime.now())) {
       return;
     }
 
@@ -202,7 +214,7 @@ class ScreenTrack {
           'readOnscreenCount': _readOnscreen.length,
         },
       );
-      
+
       // 上报成功后调用回调，同步本地状态
       if (statusCode != null && statusCode < 400) {
         _ajaxFailures = 0;
@@ -212,9 +224,14 @@ class ScreenTrack {
         }
       } else {
         if (statusCode != null && _allowedAjaxFailures.contains(statusCode)) {
-          final delayIndex = _ajaxFailures.clamp(0, _ajaxFailureDelays.length - 1);
+          final delayIndex = _ajaxFailures.clamp(
+            0,
+            _ajaxFailureDelays.length - 1,
+          );
           _ajaxFailures += 1;
-          _blockSendingUntil = DateTime.now().add(_ajaxFailureDelays[delayIndex]);
+          _blockSendingUntil = DateTime.now().add(
+            _ajaxFailureDelays[delayIndex],
+          );
           _consolidateTimings(next.timings, next.topicTime, next.topicId);
         }
       }

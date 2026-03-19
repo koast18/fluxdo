@@ -29,6 +29,20 @@ mixin _UsersMixin on _DiscourseServiceBase {
 
   /// 获取用户信息
   Future<User> getUser(String username) async {
+    final activeRequest = _activeUserRequests[username];
+    if (activeRequest != null) return activeRequest;
+
+    late final Future<User> request;
+    request = _fetchUser(username).whenComplete(() {
+      if (identical(_activeUserRequests[username], request)) {
+        _activeUserRequests.remove(username);
+      }
+    });
+    _activeUserRequests[username] = request;
+    return request;
+  }
+
+  Future<User> _fetchUser(String username) async {
     final response = await _dio.get('/u/$username.json');
     final data = response.data as Map<String, dynamic>;
     return User.fromJson(data['user'] ?? data);
@@ -82,6 +96,20 @@ mixin _UsersMixin on _DiscourseServiceBase {
       return _cachedUserSummary!;
     }
 
+    final activeRequest = _activeUserSummaryRequests[username];
+    if (activeRequest != null) return activeRequest;
+
+    late final Future<UserSummary> request;
+    request = _fetchUserSummary(username).whenComplete(() {
+      if (identical(_activeUserSummaryRequests[username], request)) {
+        _activeUserSummaryRequests.remove(username);
+      }
+    });
+    _activeUserSummaryRequests[username] = request;
+    return request;
+  }
+
+  Future<UserSummary> _fetchUserSummary(String username) async {
     final response = await _dio.get('/u/$username/summary.json');
     final summary = UserSummary.fromJson(response.data);
 
@@ -286,9 +314,7 @@ mixin _UsersMixin on _DiscourseServiceBase {
     return results;
   }
 
-  InviteLinkResponse _inviteResponseFromPendingItem(
-    Map<String, dynamic> item,
-  ) {
+  InviteLinkResponse _inviteResponseFromPendingItem(Map<String, dynamic> item) {
     final payload = Map<String, dynamic>.from(item);
     if (!payload.containsKey('invite_link')) {
       final url = payload['invite_url'] ?? payload['url'] ?? payload['link'];
@@ -312,21 +338,17 @@ mixin _UsersMixin on _DiscourseServiceBase {
     String? description,
     String? email,
   }) async {
-    try {
-      final response = await _dio.post(
-        '/invites',
-        data: {
-          'max_redemptions_allowed': maxRedemptionsAllowed,
-          if (expiresAt != null)
-            'expires_at': expiresAt.toUtc().toIso8601String(),
-          if (description != null && description.trim().isNotEmpty)
-            'description': description.trim(),
-          if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
-        },
-      );
-      return InviteLinkResponse.fromJson(response.data as Map<String, dynamic>);
-    } on DioException catch (e) {
-      rethrow;
-    }
+    final response = await _dio.post(
+      '/invites',
+      data: {
+        'max_redemptions_allowed': maxRedemptionsAllowed,
+        if (expiresAt != null)
+          'expires_at': expiresAt.toUtc().toIso8601String(),
+        if (description != null && description.trim().isNotEmpty)
+          'description': description.trim(),
+        if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+      },
+    );
+    return InviteLinkResponse.fromJson(response.data as Map<String, dynamic>);
   }
 }

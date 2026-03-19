@@ -34,13 +34,11 @@ class _RequestEntry {
 
 /// 基于 HeapPriorityQueue 的优先级队列
 class _PriorityQueue {
-  final _queue = HeapPriorityQueue<_RequestEntry>(
-    (a, b) {
-      final cmp = a.priority.value.compareTo(b.priority.value);
-      if (cmp != 0) return cmp;
-      return a.sequence.compareTo(b.sequence);
-    },
-  );
+  final _queue = HeapPriorityQueue<_RequestEntry>((a, b) {
+    final cmp = a.priority.value.compareTo(b.priority.value);
+    if (cmp != 0) return cmp;
+    return a.sequence.compareTo(b.sequence);
+  });
 
   bool get isEmpty => _queue.isEmpty;
   bool get isNotEmpty => _queue.isNotEmpty;
@@ -57,10 +55,7 @@ class _RateLimiter {
   final Duration windowDuration;
   final _timestamps = Queue<DateTime>();
 
-  _RateLimiter({
-    required this.maxPerWindow,
-    required this.windowDuration,
-  });
+  _RateLimiter({required this.maxPerWindow, required this.windowDuration});
 
   /// 驱逐过期时间戳
   void _evict(DateTime now) {
@@ -113,8 +108,8 @@ class RequestSchedulerInterceptor extends Interceptor {
   );
 
   RequestSchedulerInterceptor({
-    this.maxConcurrent = 6,
-    this.maxPerWindow = 10,
+    this.maxConcurrent = 3,
+    this.maxPerWindow = 6,
     this.windowDuration = const Duration(seconds: 3),
   });
 

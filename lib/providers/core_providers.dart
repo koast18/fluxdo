@@ -1,3 +1,5 @@
+// ignore_for_file: invalid_use_of_internal_member
+
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -84,7 +86,8 @@ class CurrentUserNotifier extends AsyncNotifier<User?> {
   /// 静默刷新，带冷却时间（默认 2 分钟内不重复请求）
   /// 不提前 emit 中间状态，只在拿到结果后更新一次，避免多余 rebuild
   Future<void> refreshSilently({bool force = false}) async {
-    if (!force && _lastRefreshTime != null &&
+    if (!force &&
+        _lastRefreshTime != null &&
         DateTime.now().difference(_lastRefreshTime!) < _refreshCooldown) {
       return;
     }
@@ -101,8 +104,10 @@ class CurrentUserNotifier extends AsyncNotifier<User?> {
     } catch (e, st) {
       // 刷新失败，保留旧数据并标记错误状态（用于离线提示）
       if (previous != null) {
-        // ignore: invalid_use_of_internal_member
-        state = AsyncValue<User?>.error(e, st).copyWithPrevious(AsyncValue.data(previous));
+        state = AsyncValue<User?>.error(
+          e,
+          st,
+        ).copyWithPrevious(AsyncValue.data(previous));
       }
     }
   }
@@ -125,7 +130,8 @@ class CurrentUserNotifier extends AsyncNotifier<User?> {
   User _mergeUser(User user, User preloadedUser) {
     return user.copyWith(
       unreadNotifications: preloadedUser.unreadNotifications,
-      unreadHighPriorityNotifications: preloadedUser.unreadHighPriorityNotifications,
+      unreadHighPriorityNotifications:
+          preloadedUser.unreadHighPriorityNotifications,
       allUnreadNotificationsCount: preloadedUser.allUnreadNotificationsCount,
       seenNotificationId: preloadedUser.seenNotificationId,
       notificationChannelPosition: preloadedUser.notificationChannelPosition,
@@ -144,8 +150,9 @@ class CurrentUserNotifier extends AsyncNotifier<User?> {
   }
 }
 
-final currentUserProvider =
-    AsyncNotifierProvider<CurrentUserNotifier, User?>(CurrentUserNotifier.new);
+final currentUserProvider = AsyncNotifierProvider<CurrentUserNotifier, User?>(
+  CurrentUserNotifier.new,
+);
 
 /// 系统用户头像模板 Provider
 /// 用于通知列表中没有 acting_user 时的默认头像
@@ -161,14 +168,19 @@ class UserSummaryNotifier extends AsyncNotifier<UserSummary?> {
   @override
   Future<UserSummary?> build() async {
     final service = ref.watch(discourseServiceProvider);
-    final user = await ref.watch(currentUserProvider.future);
-    if (user == null) return null;
+    final currentUsername = ref.watch(
+      currentUserProvider.select((value) => value.value?.username),
+    );
+    final username =
+        currentUsername ??
+        (await ref.watch(currentUserProvider.future))?.username;
+    if (username == null) return null;
 
     // 先尝试从 SP 读取缓存
     final prefs = await SharedPreferences.getInstance();
     final cachedUser = prefs.getString(_cacheUserKey);
     // 切换账号时清除旧缓存
-    if (cachedUser != null && cachedUser != user.username) {
+    if (cachedUser != null && cachedUser != username) {
       await _clearCache(prefs);
     }
 
@@ -184,8 +196,8 @@ class UserSummaryNotifier extends AsyncNotifier<UserSummary?> {
     }
 
     try {
-      final summary = await service.getUserSummary(user.username);
-      _saveCache(prefs, summary, user.username);
+      final summary = await service.getUserSummary(username);
+      _saveCache(prefs, summary, username);
       return summary;
     } catch (e) {
       if (cachedSummary != null) return cachedSummary;
@@ -200,20 +212,29 @@ class UserSummaryNotifier extends AsyncNotifier<UserSummary?> {
       final user = ref.read(currentUserProvider).value;
       if (user == null) return;
 
-      final summary = await service.getUserSummary(user.username, forceRefresh: true);
+      final summary = await service.getUserSummary(
+        user.username,
+        forceRefresh: true,
+      );
       final prefs = await SharedPreferences.getInstance();
       _saveCache(prefs, summary, user.username);
       state = AsyncValue.data(summary);
     } catch (e, st) {
       // 刷新失败，保留旧数据并标记错误状态
       if (previous != null) {
-        // ignore: invalid_use_of_internal_member
-        state = AsyncValue<UserSummary?>.error(e, st).copyWithPrevious(AsyncValue.data(previous));
+        state = AsyncValue<UserSummary?>.error(
+          e,
+          st,
+        ).copyWithPrevious(AsyncValue.data(previous));
       }
     }
   }
 
-  void _saveCache(SharedPreferences prefs, UserSummary summary, String username) {
+  void _saveCache(
+    SharedPreferences prefs,
+    UserSummary summary,
+    String username,
+  ) {
     prefs.setString(_cacheKey, jsonEncode(summary.toCacheJson()));
     prefs.setString(_cacheUserKey, username);
   }
@@ -230,4 +251,6 @@ class UserSummaryNotifier extends AsyncNotifier<UserSummary?> {
 }
 
 final userSummaryProvider =
-    AsyncNotifierProvider<UserSummaryNotifier, UserSummary?>(UserSummaryNotifier.new);
+    AsyncNotifierProvider<UserSummaryNotifier, UserSummary?>(
+      UserSummaryNotifier.new,
+    );

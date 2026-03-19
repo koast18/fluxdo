@@ -69,6 +69,8 @@ abstract class _DiscourseServiceBase {
   set _cachedUserSummaryUsername(String? value);
   DateTime? get _userSummaryCacheTime;
   set _userSummaryCacheTime(DateTime? value);
+  Map<String, Future<User>> get _activeUserRequests;
+  Map<String, Future<UserSummary>> get _activeUserSummaryRequests;
 
   ValueNotifier<User?> get currentUserNotifier;
   StreamController<String> get _authErrorController;
@@ -130,6 +132,10 @@ class DiscourseService extends _DiscourseServiceBase
   String? _cachedUserSummaryUsername;
   @override
   DateTime? _userSummaryCacheTime;
+  @override
+  final Map<String, Future<User>> _activeUserRequests = {};
+  @override
+  final Map<String, Future<UserSummary>> _activeUserSummaryRequests = {};
 
   @override
   final ValueNotifier<User?> currentUserNotifier = ValueNotifier<User?>(null);
@@ -158,16 +164,16 @@ class DiscourseService extends _DiscourseServiceBase
   bool get isAuthenticated => _tToken != null && _tToken!.isNotEmpty;
 
   DiscourseService._internal()
-      : _dio = DiscourseDio.create(
-          defaultHeaders: {
-            'Accept': 'application/json;q=0.9, text/plain;q=0.8, */*;q=0.5',
-            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-            'X-Requested-With': 'XMLHttpRequest',
-          },
-        ),
-        _storage = const FlutterSecureStorage(
-          mOptions: MacOsOptions(useDataProtectionKeyChain: false),
-        ) {
+    : _dio = DiscourseDio.create(
+        defaultHeaders: {
+          'Accept': 'application/json;q=0.9, text/plain;q=0.8, */*;q=0.5',
+          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      ),
+      _storage = const FlutterSecureStorage(
+        mOptions: MacOsOptions(useDataProtectionKeyChain: false),
+      ) {
     _initInterceptors();
   }
 
