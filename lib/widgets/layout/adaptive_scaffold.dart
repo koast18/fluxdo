@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../pages/topics_page.dart';
@@ -44,7 +45,11 @@ class AdaptiveScaffold extends ConsumerWidget {
         ? ref.watch(barVisibilityProvider)
         : 1.0;
 
+    final isDesktop = Platform.isMacOS || Platform.isWindows || Platform.isLinux;
+    final useAcrylicRail = showRail && isDesktop;
+
     return Scaffold(
+      backgroundColor: useAcrylicRail ? Colors.transparent : null,
       body: Row(
         children: [
           if (showRail) ...[
@@ -55,11 +60,17 @@ class AdaptiveScaffold extends ConsumerWidget {
               extended: extendedRail,
               leading: railLeading,
             ),
-            const VerticalDivider(thickness: 1, width: 1),
+            if (!useAcrylicRail)
+              const VerticalDivider(thickness: 1, width: 1),
           ],
           Expanded(
             key: const ValueKey('adaptive-body'),
-            child: body,
+            // 桌面 acrylic 模式：用 Material 给 body 提供不透明背景
+            // TopicsScreen 等页面没有自己的 Scaffold，
+            // Material 和 Scaffold 内部是同一个组件，不会产生双层背景
+            child: useAcrylicRail
+                ? Material(color: Theme.of(context).colorScheme.surface, child: body)
+                : body,
           ),
         ],
       ),

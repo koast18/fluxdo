@@ -77,6 +77,7 @@ dependencies:
   catcher_2: ^2.1.5
 
   window_manager: ^0.5.1
+  flutter_acrylic: ^1.1.4
 
   flutter_dynamic_icon_plus: ^1.4.0  # 动态应用图标切换
   flutter_foreground_task: ^9.2.0  # Android 前台服务保活

@@ -10,6 +10,7 @@ import 'l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:flutter_acrylic/flutter_acrylic.dart' as acrylic;
 import 'pages/topics_page.dart';
 import 'pages/topics_screen.dart';
 import 'pages/profile_page.dart';
@@ -48,6 +49,7 @@ import 'services/log/json_file_handler.dart';
 import 'services/log/log_writer.dart';
 import 'services/log/logger_utils.dart';
 import 'services/navigation/app_route_observer.dart';
+import 'services/window_state_service.dart';
 import 'models/user.dart';
 import 'constants.dart';
 import 'providers/connectivity_provider.dart';
@@ -93,12 +95,28 @@ Future<void> main() async {
     CookieSyncService().init(),
     BackgroundNotificationService().initialize(),
   ];
-  // 桌面平台初始化 window_manager（用于视频全屏等窗口控制）
+  // 桌面平台初始化 window_manager 和 flutter_acrylic
   if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
     futures.add(windowManager.ensureInitialized());
+    futures.add(acrylic.Window.initialize());
   }
   final results = await Future.wait(futures);
   final prefs = results[0] as SharedPreferences;
+
+  // 桌面平台：恢复窗口状态后再显示，避免默认位置闪烁
+  if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+    await acrylic.Window.setEffect(
+      effect: Platform.isMacOS
+          ? acrylic.WindowEffect.sidebar
+          : Platform.isWindows
+              ? acrylic.WindowEffect.acrylic
+              : acrylic.WindowEffect.transparent,
+    );
+    await windowManager.waitUntilReadyToShow(null, () async {
+      await windowManager.setPreventClose(true);
+      await WindowStateService.instance.restore(prefs);
+    });
+  }
 
   // 阶段 2：依赖 prefs 的步骤并行
   final crashlyticsEnabled = prefs.getBool('pref_crashlytics') ?? false;
@@ -321,6 +339,21 @@ class MainApp extends ConsumerWidget {
             final iconBrightness = brightness == Brightness.light
                 ? Brightness.dark
                 : Brightness.light;
+            // 桌面平台：跟随应用主题明暗切换窗口效果
+            if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+              final isDark = brightness == Brightness.dark;
+              acrylic.Window.setEffect(
+                effect: Platform.isMacOS
+                    ? acrylic.WindowEffect.sidebar
+                    : Platform.isWindows
+                        ? acrylic.WindowEffect.acrylic
+                        : acrylic.WindowEffect.transparent,
+                dark: isDark,
+              );
+              if (Platform.isMacOS) {
+                acrylic.Window.overrideMacOSBrightness(dark: isDark);
+              }
+            }
             return AnnotatedRegion<SystemUiOverlayStyle>(
               value: SystemUiOverlayStyle(
                 statusBarColor: Colors.transparent,
@@ -379,6 +412,9 @@ class _MainPageState extends ConsumerState<MainPage> with WidgetsBindingObserver
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+      WindowStateService.instance.startListening();
+    }
 
     // 设置导航 context（用于 CF 验证弹窗）
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -480,6 +516,9 @@ class _MainPageState extends ConsumerState<MainPage> with WidgetsBindingObserver
 
   @override
   void dispose() {
+    if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+      WindowStateService.instance.stopListening();
+    }
     WidgetsBinding.instance.removeObserver(this);
     _resumeDebounceTimer?.cancel();
     _authErrorSub?.close();

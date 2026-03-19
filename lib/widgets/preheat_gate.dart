@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:jovial_svg/jovial_svg.dart';
@@ -175,9 +176,10 @@ class _PreheatLoadingState extends State<_PreheatLoading>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDesktop = Platform.isMacOS || Platform.isWindows || Platform.isLinux;
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: isDesktop ? Colors.transparent : colorScheme.surface,
       body: Stack(
         children: [
           Center(
@@ -334,8 +336,10 @@ class _PreheatFailed extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
 
+    final isDesktop = Platform.isMacOS || Platform.isWindows || Platform.isLinux;
+
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: isDesktop ? Colors.transparent : colorScheme.surface,
       body: SafeArea(
         child: Stack(
           children: [

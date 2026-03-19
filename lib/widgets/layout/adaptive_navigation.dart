@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
 
 /// 导航目标项配置
 class AdaptiveDestination {
@@ -39,12 +41,13 @@ class AdaptiveNavigationRail extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDesktop = Platform.isMacOS || Platform.isWindows || Platform.isLinux;
 
     final splitIndex = destinations.length - bottomDestinationCount;
     final topDestinations = destinations.sublist(0, splitIndex);
     final bottomDestinations = destinations.sublist(splitIndex);
 
-    return SafeArea(
+    Widget rail = SafeArea(
       child: SizedBox(
         width: extended ? 180 : 72,
         child: Column(
@@ -90,6 +93,17 @@ class AdaptiveNavigationRail extends StatelessWidget {
         ),
       ),
     );
+
+    // 桌面平台：透明背景让窗口 acrylic 效果透出 + 拖动窗口
+    if (isDesktop) {
+      return GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onPanStart: (_) => windowManager.startDragging(),
+        child: rail,
+      );
+    }
+
+    return rail;
   }
 }
 

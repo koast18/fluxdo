@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import '../../l10n/s.dart';
 import '../../utils/responsive.dart';
 import '../../utils/layout_lock.dart';
+import 'draggable_divider.dart';
 
 /// Master-Detail 双栏布局
 /// 平板/桌面上显示双栏，手机上只显示 master 或 detail
 ///
 /// 使用统一 Row > SizedBox 结构，确保布局切换时 master 不会被卸载重建。
-class MasterDetailLayout extends StatelessWidget {
+class MasterDetailLayout extends StatefulWidget {
   static const double defaultMasterWidth = 380;
   static const double defaultMinDetailWidth = 400;
+  static const double minMasterWidth = 280;
+  static const double maxMasterWidth = 520;
 
   const MasterDetailLayout({
     super.key,
@@ -34,7 +37,7 @@ class MasterDetailLayout extends StatelessWidget {
   /// 主列表区域的 FAB
   final Widget? masterFloatingActionButton;
 
-  /// 主列表宽度
+  /// 主列表初始宽度
   final double masterWidth;
 
   /// 详情区最小宽度
@@ -64,39 +67,84 @@ class MasterDetailLayout extends StatelessWidget {
   }
 
   @override
+  State<MasterDetailLayout> createState() => _MasterDetailLayoutState();
+}
+
+class _MasterDetailLayoutState extends State<MasterDetailLayout> {
+  late double _currentMasterWidth;
+  double? _dragStartWidth;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentMasterWidth = widget.masterWidth;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    // 使用 LayoutBuilder 获取实际可用宽度（已扣除 Rail 宽度）
     return LayoutBuilder(
       builder: (context, constraints) {
         final totalWidth = constraints.maxWidth;
-        final showBothPanes = canShowBothPanes(context);
-        final mWidth = showBothPanes ? masterWidth : totalWidth;
+        final showBothPanes = widget.canShowBothPanes(context);
 
-        return Row(
+        // 根据可用宽度动态限制 master 宽度
+        final maxAllowed = totalWidth - MasterDetailLayout.defaultMinDetailWidth;
+        final clampedWidth = _currentMasterWidth.clamp(
+          MasterDetailLayout.minMasterWidth,
+          maxAllowed.clamp(MasterDetailLayout.minMasterWidth, MasterDetailLayout.maxMasterWidth),
+        );
+        final mWidth = showBothPanes ? clampedWidth : totalWidth;
+
+        final row = Row(
           children: [
             SizedBox(
               key: const ValueKey('master-pane'),
               width: mWidth,
               child: Stack(
                 children: [
-                  master,
-                  if (masterFloatingActionButton != null)
+                  widget.master,
+                  if (widget.masterFloatingActionButton != null)
                     Positioned(
                       right: 16,
                       bottom: 16 + bottomPadding,
-                      child: masterFloatingActionButton!,
+                      child: widget.masterFloatingActionButton!,
                     ),
                 ],
               ),
             ),
             if (showBothPanes) ...[
-              if (showDivider) const VerticalDivider(width: 1, thickness: 1),
+              const VerticalDivider(width: 1, thickness: 1),
               Expanded(
-                child: detail ?? emptyDetail ?? _buildEmptyState(context),
+                child: widget.detail ?? widget.emptyDetail ?? _buildEmptyState(context),
               ),
             ],
+          ],
+        );
+
+        if (!showBothPanes) return row;
+
+        return Stack(
+          children: [
+            row,
+            Positioned(
+              left: mWidth - 8,
+              top: 0,
+              bottom: 0,
+              width: 16,
+              child: DraggableDivider(
+                onResizeStart: () => _dragStartWidth = _currentMasterWidth,
+                onResizeUpdate: (globalX, startX) {
+                  setState(() {
+                    final desired = _dragStartWidth! + (globalX - startX);
+                    final maxW = (totalWidth - MasterDetailLayout.defaultMinDetailWidth)
+                        .clamp(MasterDetailLayout.minMasterWidth, MasterDetailLayout.maxMasterWidth);
+                    _currentMasterWidth = desired.clamp(MasterDetailLayout.minMasterWidth, maxW);
+                  });
+                },
+              ),
+            ),
           ],
         );
       },
