@@ -52,11 +52,11 @@ def main() -> int:
     package_files = []
     if artifacts_dir.exists():
         package_files = sorted(
-            p for p in artifacts_dir.iterdir() if p.is_file() and p.suffix in {".apk", ".ipa", ".dmg"}
+            p for p in artifacts_dir.iterdir() if p.is_file() and p.suffix in {".apk", ".ipa", ".dmg", ".exe"}
         )
 
     if not package_files:
-        print("No APK/IPA/DMG files found in dist/, skipping.")
+        print("No package files found in dist/, skipping.")
         return 0
 
     media = []
