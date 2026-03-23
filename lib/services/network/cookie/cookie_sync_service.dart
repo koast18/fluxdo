@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../constants.dart';
+import '../../app_logger.dart';
 import '../adapters/platform_adapter.dart';
 import 'app_cookie_manager.dart';
 import 'cookie_jar_service.dart';
@@ -84,8 +85,9 @@ class CookieSyncService {
   Future<void> _fetchCsrfToken() async {
     try {
       final dio = await _getMainSiteDio();
+      const path = '/session/csrf';
       final response = await dio.get(
-        '/session/csrf',
+        path,
         options: Options(
           extra: {
             'skipCsrf': true,
@@ -99,9 +101,31 @@ class CookieSyncService {
       if (csrf != null && csrf.isNotEmpty) {
         setCsrfToken(csrf);
         debugPrint('[CookieSyncService] CSRF token 已刷新');
+        AppLogger.info('CSRF token 已刷新', tag: 'CookieSyncService');
       }
-    } catch (e) {
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      final uri = e.requestOptions.uri.toString();
+      final responseText = e.response?.data?.toString();
+      final responsePreview = responseText == null
+          ? '<null>'
+          : responseText.substring(
+              0,
+              responseText.length > 200 ? 200 : responseText.length,
+            );
+      final message =
+          'CSRF token 刷新失败: status=$statusCode, url=$uri, '
+          'type=${e.type}, response=$responsePreview';
+      debugPrint('[CookieSyncService] $message');
+      AppLogger.warning(message, tag: 'CookieSyncService');
+    } catch (e, stackTrace) {
       debugPrint('[CookieSyncService] CSRF token 刷新失败: $e');
+      AppLogger.error(
+        'CSRF token 刷新异常',
+        tag: 'CookieSyncService',
+        error: e,
+        stackTrace: stackTrace,
+      );
     }
   }
 

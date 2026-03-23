@@ -6689,6 +6689,18 @@ abstract class AppLocalizations {
   /// **'记住账号密码，登录时自动填充'**
   String get preferences_autoFillLoginDesc;
 
+  /// No description provided for @preferences_cfClearanceRefresh.
+  ///
+  /// In zh, this message translates to:
+  /// **'cf_clearance 自动续期'**
+  String get preferences_cfClearanceRefresh;
+
+  /// No description provided for @preferences_cfClearanceRefreshDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'通过后台 WebView 自动续期 cf_clearance Cookie'**
+  String get preferences_cfClearanceRefreshDesc;
+
   /// No description provided for @preferences_portraitLock.
   ///
   /// In zh, this message translates to:

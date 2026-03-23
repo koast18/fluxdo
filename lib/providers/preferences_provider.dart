@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/network/request_scheduler_config.dart';
+import '../services/cf_clearance_refresh_service.dart';
 import 'theme_provider.dart';
 
 class AppPreferences {
@@ -28,6 +29,8 @@ class AppPreferences {
   final bool hideBarOnScroll;
   /// 退出时清除图片缓存
   final bool clearCacheOnExit;
+  /// cf_clearance 自动续期
+  final bool cfClearanceRefresh;
   /// 最大并发请求数
   final int maxConcurrent;
   /// 滑动窗口内最大请求数
@@ -48,6 +51,7 @@ class AppPreferences {
     required this.portraitLock,
     required this.hideBarOnScroll,
     required this.clearCacheOnExit,
+    required this.cfClearanceRefresh,
     required this.maxConcurrent,
     required this.maxPerWindow,
     required this.windowSeconds,
@@ -66,6 +70,7 @@ class AppPreferences {
     bool? portraitLock,
     bool? hideBarOnScroll,
     bool? clearCacheOnExit,
+    bool? cfClearanceRefresh,
     int? maxConcurrent,
     int? maxPerWindow,
     int? windowSeconds,
@@ -84,6 +89,7 @@ class AppPreferences {
       portraitLock: portraitLock ?? this.portraitLock,
       hideBarOnScroll: hideBarOnScroll ?? this.hideBarOnScroll,
       clearCacheOnExit: clearCacheOnExit ?? this.clearCacheOnExit,
+      cfClearanceRefresh: cfClearanceRefresh ?? this.cfClearanceRefresh,
       maxConcurrent: maxConcurrent ?? this.maxConcurrent,
       maxPerWindow: maxPerWindow ?? this.maxPerWindow,
       windowSeconds: windowSeconds ?? this.windowSeconds,
@@ -105,6 +111,8 @@ class PreferencesNotifier extends StateNotifier<AppPreferences> {
   static const String _portraitLockKey = 'pref_portrait_lock';
   static const String _hideBarOnScrollKey = 'pref_hide_bar_on_scroll';
   static const String _clearCacheOnExitKey = 'pref_clear_cache_on_exit';
+  static const String _cfClearanceRefreshKey =
+      CfClearanceRefreshService.prefKeyEnabled;
   static const String _maxConcurrentKey = 'pref_max_concurrent';
   static const String _maxPerWindowKey = 'pref_max_per_window';
   static const String _windowSecondsKey = 'pref_window_seconds';
@@ -128,6 +136,8 @@ class PreferencesNotifier extends StateNotifier<AppPreferences> {
             portraitLock: _prefs.getBool(_portraitLockKey) ?? false,
             hideBarOnScroll: _prefs.getBool(_hideBarOnScrollKey) ?? true,
             clearCacheOnExit: _prefs.getBool(_clearCacheOnExitKey) ?? false,
+            cfClearanceRefresh:
+                _prefs.getBool(_cfClearanceRefreshKey) ?? false,
             maxConcurrent: _prefs.getInt(_maxConcurrentKey) ?? 3,
             maxPerWindow: _prefs.getInt(_maxPerWindowKey) ?? 6,
             windowSeconds: _prefs.getInt(_windowSecondsKey) ?? 3,
@@ -214,6 +224,11 @@ class PreferencesNotifier extends StateNotifier<AppPreferences> {
   Future<void> setClearCacheOnExit(bool enabled) async {
     state = state.copyWith(clearCacheOnExit: enabled);
     await _prefs.setBool(_clearCacheOnExitKey, enabled);
+  }
+
+  Future<void> setCfClearanceRefresh(bool enabled) async {
+    state = state.copyWith(cfClearanceRefresh: enabled);
+    await CfClearanceRefreshService().setEnabled(enabled);
   }
 
   Future<void> setMaxConcurrent(int value) async {

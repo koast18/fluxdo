@@ -165,6 +165,7 @@ Future<void> main() async {
   await NetworkSettingsService.instance.initialize(prefs);
   VpnAutoToggleService.instance.initialize(prefs);
   HCaptchaAccessibilityService().initialize(prefs);
+  CfClearanceRefreshService().initialize(prefs);
   try {
     final initialConnectivity = await ConnectivityService.safeCheckConnectivity();
     await VpnAutoToggleService.instance.syncInitialState(initialConnectivity);

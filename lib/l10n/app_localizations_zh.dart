@@ -3604,6 +3604,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get preferences_autoFillLoginDesc => '记住账号密码，登录时自动填充';
 
   @override
+  String get preferences_cfClearanceRefresh => 'cf_clearance 自动续期';
+
+  @override
+  String get preferences_cfClearanceRefreshDesc =>
+      '通过后台 WebView 自动续期 cf_clearance Cookie';
+
+  @override
   String get preferences_portraitLock => '竖屏锁定';
 
   @override
@@ -8932,6 +8939,13 @@ class AppLocalizationsZhHk extends AppLocalizationsZh {
   String get preferences_autoFillLoginDesc => '記住賬號密碼，登錄時自動填充';
 
   @override
+  String get preferences_cfClearanceRefresh => 'cf_clearance 自動續期';
+
+  @override
+  String get preferences_cfClearanceRefreshDesc =>
+      '透過後台 WebView 自動續期 cf_clearance Cookie';
+
+  @override
   String get preferences_portraitLock => '豎屏鎖定';
 
   @override
@@ -14137,6 +14151,13 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get preferences_autoFillLoginDesc => '記住賬號密碼，登入時自動填充';
+
+  @override
+  String get preferences_cfClearanceRefresh => 'cf_clearance 自動續期';
+
+  @override
+  String get preferences_cfClearanceRefreshDesc =>
+      '透過後台 WebView 自動續期 cf_clearance Cookie';
 
   @override
   String get preferences_portraitLock => '豎屏鎖定';

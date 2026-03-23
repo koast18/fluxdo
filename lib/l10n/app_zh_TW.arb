@@ -2196,6 +2196,8 @@
   "preferences_anonymousShareDesc": "分享連結時不附帶個人使用者標識",
   "preferences_autoFillLogin": "自動填充登入",
   "preferences_autoFillLoginDesc": "記住賬號密碼，登入時自動填充",
+  "preferences_cfClearanceRefresh": "cf_clearance 自動續期",
+  "preferences_cfClearanceRefreshDesc": "透過後台 WebView 自動續期 cf_clearance Cookie",
   "preferences_portraitLock": "豎屏鎖定",
   "preferences_portraitLockDesc": "鎖定螢幕方向為豎屏",
   "preferences_editor": "編輯器",

@@ -1160,6 +1160,8 @@
   "preferences_anonymousShareDesc": "Share links without personal user identifier",
   "preferences_autoFillLogin": "Auto-fill login",
   "preferences_autoFillLoginDesc": "Remember credentials and auto-fill on login",
+  "preferences_cfClearanceRefresh": "cf_clearance auto refresh",
+  "preferences_cfClearanceRefreshDesc": "Refresh the cf_clearance cookie through a background WebView.",
   "preferences_portraitLock": "Portrait lock",
   "preferences_portraitLockDesc": "Lock screen orientation to portrait",
   "preferences_editor": "Editor",

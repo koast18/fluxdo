@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../cf_challenge_service.dart';
 import '../../cf_challenge_logger.dart';
 import '../../cf_clearance_refresh_service.dart';
+import '../../app_logger.dart';
 import '../cookie/cookie_jar_service.dart';
 import '../../../l10n/s.dart';
 import '../exceptions/api_exception.dart';
@@ -103,7 +104,14 @@ class CfChallengeInterceptor extends Interceptor {
       CfClearanceRefreshService().stop();
 
       final requestUrl = err.requestOptions.uri.toString();
-      debugPrint('[Dio] CF Challenge detected, showing manual verify...');
+      final requestMethod = err.requestOptions.method.toUpperCase();
+      final requestTag = err.requestOptions.extra['requestTag']?.toString();
+      final logMessage =
+          'CF Challenge detected: $requestMethod $requestUrl '
+          '(status=$statusCode, silent=${err.requestOptions.extra['isSilent'] == true}, '
+          'tag=${requestTag ?? '-'}, skipCsrf=${err.requestOptions.extra['skipCsrf'] == true})';
+      debugPrint('[Dio] $logMessage');
+      AppLogger.warning(logMessage, tag: 'CfChallengeInterceptor');
       CfChallengeLogger.logInterceptorDetected(
         url: requestUrl,
         statusCode: statusCode!,

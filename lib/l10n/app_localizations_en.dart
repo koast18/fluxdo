@@ -3665,6 +3665,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Remember credentials and auto-fill on login';
 
   @override
+  String get preferences_cfClearanceRefresh => 'cf_clearance auto refresh';
+
+  @override
+  String get preferences_cfClearanceRefreshDesc =>
+      'Refresh the cf_clearance cookie through a background WebView.';
+
+  @override
   String get preferences_portraitLock => 'Portrait lock';
 
   @override

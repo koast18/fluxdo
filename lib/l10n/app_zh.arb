@@ -1306,6 +1306,8 @@
   "preferences_anonymousShareDesc": "分享链接时不附带个人用户标识",
   "preferences_autoFillLogin": "自动填充登录",
   "preferences_autoFillLoginDesc": "记住账号密码，登录时自动填充",
+  "preferences_cfClearanceRefresh": "cf_clearance 自动续期",
+  "preferences_cfClearanceRefreshDesc": "通过后台 WebView 自动续期 cf_clearance Cookie",
   "preferences_portraitLock": "竖屏锁定",
   "preferences_portraitLockDesc": "锁定屏幕方向为竖屏",
   "preferences_editor": "编辑器",

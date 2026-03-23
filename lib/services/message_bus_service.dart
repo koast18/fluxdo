@@ -266,7 +266,10 @@ class MessageBusService {
             contentType: Headers.formUrlEncodedContentType,
             responseType: ResponseType.stream,
             headers: extraHeaders.isNotEmpty ? extraHeaders : null,
-            extra: {'isSilent': true},
+            extra: {
+              'isSilent': true,
+              'skipCsrf': true,
+            },
           ),
         );
 

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants.dart';
 import 'cf_challenge_logger.dart';
@@ -22,6 +23,30 @@ class CfClearanceRefreshService {
       CfClearanceRefreshService._internal();
   factory CfClearanceRefreshService() => _instance;
   CfClearanceRefreshService._internal();
+
+  static const String prefKeyEnabled = 'pref_cf_clearance_refresh_enabled';
+
+  SharedPreferences? _prefs;
+
+  bool get isEnabled => _prefs?.getBool(prefKeyEnabled) ?? false;
+
+  void initialize(SharedPreferences prefs) {
+    _prefs = prefs;
+  }
+
+  Future<void> setEnabled(bool enabled) async {
+    final previous = isEnabled;
+    await _prefs?.setBool(prefKeyEnabled, enabled);
+    if (previous == enabled) return;
+
+    if (enabled) {
+      CfChallengeLogger.log('[CfRefresh] 已启用自动续期');
+      start();
+    } else {
+      CfChallengeLogger.log('[CfRefresh] 已禁用自动续期');
+      stop();
+    }
+  }
 
   /// 缓存的 sitekey（来自预热 HTML 或 403 响应体）
   String? _sitekey;
@@ -97,6 +122,10 @@ class CfClearanceRefreshService {
 
   /// 启动服务：创建持久 WebView，加载 Turnstile
   void start() {
+    if (!isEnabled) {
+      CfChallengeLogger.log('[CfRefresh] 自动续期开关关闭，跳过启动');
+      return;
+    }
     if (_isRunning && !_isDisposing) return;
     _shouldBeRunning = true;
     _consecutiveFailures = 0;
@@ -120,6 +149,10 @@ class CfClearanceRefreshService {
 
   /// 恢复：重新创建 WebView（应用回到前台）
   void resume() {
+    if (!isEnabled) {
+      CfChallengeLogger.log('[CfRefresh] 自动续期开关关闭，跳过恢复');
+      return;
+    }
     if (_isRunning && !_isDisposing) return;
     _shouldBeRunning = true;
     CfChallengeLogger.log('[CfRefresh] 恢复');

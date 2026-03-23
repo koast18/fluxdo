@@ -108,6 +108,21 @@ class PreferencesPage extends ConsumerWidget {
                     ref.read(preferencesProvider.notifier).setAutoFillLogin(value);
                   },
                 ),
+                Divider(height: 1, indent: 56, color: theme.colorScheme.outlineVariant.withValues(alpha:0.3)),
+                SwitchListTile(
+                  title: Text(l10n.preferences_cfClearanceRefresh),
+                  subtitle: Text(l10n.preferences_cfClearanceRefreshDesc),
+                  secondary: Icon(
+                    Icons.security_update_warning_rounded,
+                    color: preferences.cfClearanceRefresh
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                  value: preferences.cfClearanceRefresh,
+                  onChanged: (value) {
+                    ref.read(preferencesProvider.notifier).setCfClearanceRefresh(value);
+                  },
+                ),
                 if (Platform.isIOS || Platform.isAndroid) ...[
                   Divider(height: 1, indent: 56, color: theme.colorScheme.outlineVariant.withValues(alpha:0.3)),
                   SwitchListTile(
