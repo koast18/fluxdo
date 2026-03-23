@@ -129,6 +129,7 @@ class AiL10n {
   // ---- 网络错误 ----
   String get connectionTimeoutError => '连接超时，请检查网络或 Base URL 是否正确';
   String get cannotConnectError => '无法连接到服务器，请检查 Base URL 是否正确';
+  String get apiKeyNotFoundError => '无法读取 API Key，请重新配置供应商';
   String get apiKeyInvalidError => 'API Key 无效或已过期 (401)';
   String get noAccessPermissionError => '没有访问权限，请检查 API Key (403)';
   String get endpointNotFoundError => '接口地址不存在，请检查 Base URL (404)';
@@ -139,6 +140,7 @@ class AiL10n {
   String get sslCertificateError => 'SSL 证书验证失败';
   String get networkConnectionFailed => '网络连接失败，请检查网络设置';
   String get unknownNetworkError => '未知网络错误';
+  String get emptyResponseError => '未收到 AI 回复，请检查网络设置或重试';
 
   // ---- System Prompts（影响 AI 回复语言） ----
   String get systemPromptIntro =>

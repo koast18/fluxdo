@@ -172,6 +172,9 @@ class AiL10nZhTW extends AiL10n {
   @override
   String get cannotConnectError => '無法連線到伺服器，請檢查 Base URL 是否正確';
   @override
+  @override
+  String get apiKeyNotFoundError => '無法讀取 API Key，請重新配置供應商';
+  @override
   String get apiKeyInvalidError => 'API Key 無效或已過期 (401)';
   @override
   String get noAccessPermissionError => '沒有存取權限，請檢查 API Key (403)';
@@ -191,6 +194,8 @@ class AiL10nZhTW extends AiL10n {
   String get networkConnectionFailed => '網路連線失敗，請檢查網路設定';
   @override
   String get unknownNetworkError => '未知網路錯誤';
+  @override
+  String get emptyResponseError => '未收到 AI 回覆，請檢查網路設定或重試';
 
   // ---- System Prompts ----
   @override

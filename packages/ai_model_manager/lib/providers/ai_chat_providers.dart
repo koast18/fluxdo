@@ -385,7 +385,17 @@ class TopicAiChatNotifier extends StateNotifier<TopicAiChatState> {
       // 获取 API Key
       final apiKey =
           await AiProviderListNotifier.getApiKey(selectedModel.provider.id);
-      if (apiKey == null || !mounted) return;
+      if (!mounted) return;
+      if (apiKey == null) {
+        _updateAssistantMessage(
+          assistantMessage.id,
+          '',
+          MessageStatus.error,
+          errorMessage: AiL10n.current.apiKeyNotFoundError,
+        );
+        state = state.copyWith(isGenerating: false);
+        return;
+      }
 
       // 构建上下文
       final topicContext = _cachedContextPosts != null && _cachedTitle != null
@@ -418,14 +428,23 @@ class TopicAiChatNotifier extends StateNotifier<TopicAiChatState> {
         },
         onDone: () {
           if (!mounted) return;
-          _updateAssistantMessage(
-            assistantMessage.id,
-            buffer.toString(),
-            MessageStatus.completed,
-          );
+          if (buffer.isEmpty) {
+            _updateAssistantMessage(
+              assistantMessage.id,
+              '',
+              MessageStatus.error,
+              errorMessage: AiL10n.current.emptyResponseError,
+            );
+          } else {
+            _updateAssistantMessage(
+              assistantMessage.id,
+              buffer.toString(),
+              MessageStatus.completed,
+            );
+            _saveToStorage();
+            _tryGenerateTitle();
+          }
           state = state.copyWith(isGenerating: false);
-          _saveToStorage();
-          _tryGenerateTitle();
         },
         onError: (error) {
           if (!mounted) return;

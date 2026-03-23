@@ -183,6 +183,10 @@ class AiL10nEn extends AiL10n {
   String get cannotConnectError =>
       'Cannot connect to server. Please check your Base URL';
   @override
+  @override
+  String get apiKeyNotFoundError =>
+      'Unable to read API Key. Please reconfigure the provider';
+  @override
   String get apiKeyInvalidError => 'API Key is invalid or expired (401)';
   @override
   String get noAccessPermissionError =>
@@ -206,6 +210,9 @@ class AiL10nEn extends AiL10n {
       'Network connection failed. Please check your network settings';
   @override
   String get unknownNetworkError => 'Unknown network error';
+  @override
+  String get emptyResponseError =>
+      'No response received from AI. Please check network settings or retry';
 
   // ---- System Prompts ----
   @override
