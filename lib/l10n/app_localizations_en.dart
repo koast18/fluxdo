@@ -5589,6 +5589,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Show related links expanded in posts';
 
   @override
+  String get reading_aiSwipeEntry => 'AI Assistant swipe entry';
+
+  @override
+  String get reading_aiSwipeEntryDesc =>
+      'Swipe left in topic detail to open AI Assistant';
+
+  @override
   String get schemeVariant_tonalSpot => 'Tonal Spot';
 
   @override

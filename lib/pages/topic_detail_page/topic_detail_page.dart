@@ -19,6 +19,7 @@ import '../../models/topic.dart';
 import '../../utils/responsive.dart';
 import '../../utils/share_utils.dart';
 import '../../providers/preferences_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../reading_settings_page.dart';
 import '../../providers/selected_topic_provider.dart';
 import '../../providers/discourse_providers.dart';
@@ -54,6 +55,7 @@ import '../../models/read_later_item.dart';
 import '../../providers/topic_search_provider.dart';
 import '../edit_topic_page.dart';
 import 'widgets/ai_chat_page.dart';
+import 'widgets/ai_chat_guide.dart';
 
 part 'actions/_scroll_actions.dart';
 part 'actions/_user_actions.dart';
@@ -140,6 +142,10 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage>
   bool _autoOpenReplyHandled = false; // 是否已处理自动打开回复框
   bool _autoOpenAiChatHandled = false; // 是否已处理自动打开 AI 聊天
   late final TopicSearchNotifier _topicSearchNotifier;
+  // AI 滑动入口相关
+  late final PageController _pageController;
+  final ValueNotifier<int> _currentPageNotifier = ValueNotifier<int>(0);
+  bool _aiGuideChecked = false;
   ModalRoute<dynamic>? _route;
   bool _isRouteVisible = true;
   bool _isParentActive = true;
@@ -210,6 +216,7 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage>
     );
 
     _controller.scrollController.addListener(_onScroll);
+    _pageController = PageController(initialPage: 0);
   }
 
   @override
@@ -254,6 +261,8 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage>
     _isOverlayVisibleNotifier.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _pageController.dispose();
+    _currentPageNotifier.dispose();
     _controller.scrollController.removeListener(_onScroll);
     _screenTrack.stop();
     _controller.dispose();
@@ -597,9 +606,13 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage>
         .firstOrNull;
     final canEditTopic = detail.canEdit || (firstPost?.canEdit ?? false);
 
+    final useSwipeEntry = ref.watch(
+      preferencesProvider.select((p) => p.aiSwipeEntry),
+    );
+
     return [
-      // AI 助手按钮
-      if (ref.watch(hasAvailableAiModelProvider))
+      // AI 助手按钮（滑动入口模式下隐藏）
+      if (!useSwipeEntry && ref.watch(hasAvailableAiModelProvider))
         IconButton(
           icon: const Icon(Icons.auto_awesome),
           tooltip: context.l10n.topicDetail_aiAssistant,
@@ -870,7 +883,16 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage>
                   .read(topicAiChatProvider(widget.topicId).notifier)
                   .switchSession(widget.initialSessionId!);
             }
-            _showAiAssistantSheet(topicDetail);
+            final swipeMode = ref.read(preferencesProvider).aiSwipeEntry;
+            if (swipeMode) {
+              _pageController.animateToPage(
+                1,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+              );
+            } else {
+              _showAiAssistantSheet(topicDetail);
+            }
           });
         }
       }
@@ -879,10 +901,24 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage>
     final searchState = ref.watch(topicSearchProvider(widget.topicId));
     final isSearchMode = searchState.isSearchMode;
     final hasAiModel = ref.watch(hasAvailableAiModelProvider);
+    final useSwipeEntry = ref.watch(
+      preferencesProvider.select((p) => p.aiSwipeEntry),
+    );
 
     // 保持 AI 聊天 provider 存活，避免 BottomSheet 关闭后状态丢失
     if (hasAiModel) {
       ref.watch(topicAiChatProvider(widget.topicId));
+    }
+
+    // 首次引导检查（仅滑动入口模式）
+    if (useSwipeEntry && hasAiModel && !_aiGuideChecked && detail != null) {
+      _aiGuideChecked = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          final prefs = ref.read(sharedPreferencesProvider);
+          AiChatGuide.checkAndShow(prefs);
+        }
+      });
     }
 
     final topicScaffold = Scaffold(
@@ -890,7 +926,8 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage>
       body: _buildBody(context, detailAsync, detail, notifier, isLoggedIn),
     );
 
-    if (!hasAiModel) {
+    // 无 AI 模型或非滑动入口模式：普通布局
+    if (!hasAiModel || !useSwipeEntry) {
       return LazyLoadScope(
         child: PopScope(
           canPop: !isSearchMode,
@@ -907,18 +944,70 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage>
       );
     }
 
+    // 滑动入口模式：PageView 包裹话题详情和 AI 聊天
     return LazyLoadScope(
-      child: PopScope(
-        canPop: !isSearchMode,
-        onPopInvokedWithResult: (bool didPop, dynamic result) {
-          if (!didPop) {
-            _searchController.clear();
-            ref
-                .read(topicSearchProvider(widget.topicId).notifier)
-                .exitSearchMode();
-          }
+      child: ValueListenableBuilder<int>(
+        valueListenable: _currentPageNotifier,
+        builder: (context, currentPage, _) {
+          final isOnAiPage = currentPage != 0;
+          return PopScope(
+            canPop: !isSearchMode && !isOnAiPage,
+            onPopInvokedWithResult: (bool didPop, dynamic result) {
+              if (!didPop) {
+                if (isOnAiPage) {
+                  _pageController.animateToPage(
+                    0,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOutCubic,
+                  );
+                } else {
+                  _searchController.clear();
+                  ref
+                      .read(topicSearchProvider(widget.topicId).notifier)
+                      .exitSearchMode();
+                }
+              }
+            },
+            child: PageView(
+              controller: _pageController,
+              physics: isSearchMode
+                  ? const NeverScrollableScrollPhysics()
+                  : const ClampingScrollPhysics(),
+              onPageChanged: (page) {
+                _currentPageNotifier.value = page;
+                // 离开 AI 页面时取消输入框焦点，防止返回时键盘意外弹出
+                if (page != 1) {
+                  FocusManager.instance.primaryFocus?.unfocus();
+                }
+              },
+              children: [
+                _KeepAlivePage(child: topicScaffold),
+                _KeepAlivePage(
+                  child: AiChatPage(
+                    topicId: widget.topicId,
+                    detail: detail,
+                    embedded: true,
+                    onReplyToTopic: detail == null
+                        ? null
+                        : (imageMarkdown) {
+                            _pageController.animateToPage(
+                              0,
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeOutCubic,
+                            );
+                            showReplySheet(
+                              context: context,
+                              topicId: widget.topicId,
+                              categoryId: detail.categoryId,
+                              initialContent: '$imageMarkdown\n',
+                            );
+                          },
+                  ),
+                ),
+              ],
+            ),
+          );
         },
-        child: topicScaffold,
       ),
     );
   }
@@ -1261,5 +1350,26 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage>
       },
       child: scrollView,
     );
+  }
+}
+
+/// 保持 PageView 子页面存活，防止离屏时 state 被销毁导致滚动位置丢失
+class _KeepAlivePage extends StatefulWidget {
+  final Widget child;
+  const _KeepAlivePage({required this.child});
+
+  @override
+  State<_KeepAlivePage> createState() => _KeepAlivePageState();
+}
+
+class _KeepAlivePageState extends State<_KeepAlivePage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }

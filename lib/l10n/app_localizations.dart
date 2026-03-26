@@ -10193,6 +10193,18 @@ abstract class AppLocalizations {
   /// **'帖子中的相关链接区域默认展开显示'**
   String get reading_expandRelatedLinksDesc;
 
+  /// No description provided for @reading_aiSwipeEntry.
+  ///
+  /// In zh, this message translates to:
+  /// **'AI 助手滑动入口'**
+  String get reading_aiSwipeEntry;
+
+  /// No description provided for @reading_aiSwipeEntryDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'在话题详情页向左滑动打开 AI 助手'**
+  String get reading_aiSwipeEntryDesc;
+
   /// No description provided for @schemeVariant_tonalSpot.
   ///
   /// In zh, this message translates to:

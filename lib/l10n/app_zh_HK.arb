@@ -3072,6 +3072,8 @@
   "reading_title": "閱讀設定",
   "reading_expandRelatedLinks": "預設展開相關鏈接",
   "reading_expandRelatedLinksDesc": "帖子中的相關鏈接區域預設展開顯示",
+  "reading_aiSwipeEntry": "AI 助手滑動入口",
+  "reading_aiSwipeEntryDesc": "在話題詳情頁向左滑動打開 AI 助手",
 
   "schemeVariant_tonalSpot": "柔和色調",
   "schemeVariant_fidelity": "高保真",

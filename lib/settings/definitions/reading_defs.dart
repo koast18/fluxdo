@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../l10n/s.dart';
@@ -77,6 +79,18 @@ List<SettingsGroup> buildReadingGroups(BuildContext context) {
           getValue: (ref) => ref.watch(preferencesProvider).expandRelatedLinks,
           onChanged: (ref, v) =>
               ref.read(preferencesProvider.notifier).setExpandRelatedLinks(v),
+        ),
+        PlatformConditionalModel(
+          inner: SwitchModel(
+            id: 'aiSwipeEntry',
+            title: l10n.reading_aiSwipeEntry,
+            subtitle: l10n.reading_aiSwipeEntryDesc,
+            icon: Icons.swipe_left_rounded,
+            getValue: (ref) => ref.watch(preferencesProvider).aiSwipeEntry,
+            onChanged: (ref, v) =>
+                ref.read(preferencesProvider.notifier).setAiSwipeEntry(v),
+          ),
+          condition: () => Platform.isIOS || Platform.isAndroid,
         ),
       ],
     ),

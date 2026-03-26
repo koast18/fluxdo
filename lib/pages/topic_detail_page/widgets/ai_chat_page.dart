@@ -23,13 +23,17 @@ class AiChatPage extends ConsumerStatefulWidget {
   /// 状态栏高度（从父 context 传入，modal 内部会清零 padding.top）
   final double topPadding;
 
+  /// 嵌入模式（PageView 中使用），渲染为 Scaffold + AppBar
+  final bool embedded;
+
   /// 回复话题回调（将 AI 回复内容预填到回复框）
   final void Function(String content)? onReplyToTopic;
 
   const AiChatPage({
     super.key,
     required this.topicId,
-    required this.topPadding,
+    this.topPadding = 0,
+    this.embedded = false,
     this.detail,
     this.onReplyToTopic,
   });
@@ -301,10 +305,55 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
       });
     }
 
+    if (widget.embedded) {
+      return _buildEmbedded(context, theme, chatState, chatNotifier);
+    }
+    return _buildSheet(context, theme, chatState, chatNotifier);
+  }
+
+  /// 嵌入模式（PageView 中使用）：Scaffold + AppBar
+  Widget _buildEmbedded(
+    BuildContext context,
+    ThemeData theme,
+    TopicAiChatState chatState,
+    TopicAiChatNotifier chatNotifier,
+  ) {
+    return Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: _selectionMode
+            ? _buildSelectionToolbar(context, theme)
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.auto_awesome,
+                    size: 20,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(context.l10n.ai_title),
+                ],
+              ),
+        centerTitle: false,
+        actions: _selectionMode
+            ? null
+            : _buildToolbarActions(context, theme, chatState, chatNotifier),
+      ),
+      body: _buildBody(context, theme, chatState, chatNotifier),
+    );
+  }
+
+  /// BottomSheet 模式（当前默认）
+  Widget _buildSheet(
+    BuildContext context,
+    ThemeData theme,
+    TopicAiChatState chatState,
+    TopicAiChatNotifier chatNotifier,
+  ) {
     final mediaQuery = MediaQuery.of(context);
     final bottomInset = mediaQuery.viewInsets.bottom;
     final screenHeight = mediaQuery.size.height;
-    // 内容区高度：键盘弹出时收缩，确保不超过屏幕顶部状态栏
     final contentHeight = (screenHeight * 0.9).clamp(
       0.0,
       screenHeight - widget.topPadding - bottomInset,
@@ -363,136 +412,167 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
                           ),
                           Row(
                             mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Consumer(
-                                builder: (context, ref, _) {
-                                  final scope = ref.watch(
-                                    topicAiContextScopeProvider(widget.topicId),
-                                  );
-                                  return AiContextSelector(
-                                    currentScope: scope,
-                                    onChanged: _onScopeChanged,
-                                  );
-                                },
-                              ),
-                              if (chatState.messages.isNotEmpty)
-                                IconButton(
-                                  icon: const Icon(Icons.check_box_outlined),
-                                  tooltip: context.l10n.ai_multiSelectExport,
-                                  iconSize: 20,
-                                  onPressed: _enterSelectionMode,
-                                ),
-                              SwipeDismissiblePopupMenuButton<String>(
-                                icon: const Icon(Icons.more_vert),
-                                tooltip: context.l10n.ai_moreTooltip,
-                                iconSize: 20,
-                                onSelected: (value) {
-                                  switch (value) {
-                                    case 'new_session':
-                                      chatNotifier.createNewSession();
-                                    case 'history':
-                                      _showSessionHistory(
-                                          context, chatState, chatNotifier);
-                                    case 'clear':
-                                      _confirmClear(context, chatNotifier);
-                                  }
-                                },
-                                itemBuilder: (context) => [
-                                  PopupMenuItem(
-                                    value: 'new_session',
-                                    child: ListTile(
-                                      leading: const Icon(Icons.add_comment_outlined),
-                                      title: Text(context.l10n.ai_newSession),
-                                      dense: true,
-                                      contentPadding: EdgeInsets.zero,
-                                    ),
-                                  ),
-                                  if (chatState.sessions.isNotEmpty)
-                                    PopupMenuItem(
-                                      value: 'history',
-                                      child: ListTile(
-                                        leading: const Icon(Icons.history),
-                                        title: Text(context.l10n.ai_sessionHistory),
-                                        dense: true,
-                                        contentPadding: EdgeInsets.zero,
-                                      ),
-                                    ),
-                                  if (chatState.messages.isNotEmpty)
-                                    PopupMenuItem(
-                                      value: 'clear',
-                                      child: ListTile(
-                                        leading: const Icon(Icons.delete_outline),
-                                        title: Text(context.l10n.ai_clearChat),
-                                        dense: true,
-                                        contentPadding: EdgeInsets.zero,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ],
+                            children: _buildToolbarActions(
+                              context,
+                              theme,
+                              chatState,
+                              chatNotifier,
+                            ),
                           ),
                         ],
                       ),
               ),
               const SizedBox(height: 8),
 
-              // 上下文加载提示
-              if (_isLoadingContext)
-                LinearProgressIndicator(
-                  minHeight: 2,
-                  color: theme.colorScheme.primary,
-                ),
-
-              // 聊天主要内容区
+              // Body
               Expanded(
-                child: chatState.messages.isEmpty
-                    ? _buildEmptyState(context, theme)
-                    : _buildMessageList(context, ref, chatState),
-              ),
-
-              // 底部输入区
-              AiChatInput(
-                isGenerating: chatState.isGenerating,
-                onSend: (content) {
-                  final scope = ref.read(
-                    topicAiContextScopeProvider(widget.topicId),
-                  );
-                  final model = _currentModel();
-                  if (model == null) return;
-                  _rememberModel(model);
-                  chatNotifier.sendMessage(
-                    content,
-                    scope,
-                    selectedModel: model,
-                  );
-                },
-                onStop: chatNotifier.stopGeneration,
-                bottomLeading: Consumer(
-                  builder: (context, ref, _) {
-                    final allModels = ref.watch(allAvailableAiModelsProvider);
-                    final selected = ref.watch(
-                      topicSelectedAiModelProvider(widget.topicId),
-                    );
-                    final lastUsedModel = ref.watch(
-                      lastUsedAiAssistantModelProvider,
-                    );
-                    final defaultModel = ref.watch(defaultAiModelProvider);
-                    final current = selected ?? defaultModel ?? lastUsedModel;
-                    if (allModels.length <= 1 || current == null) {
-                      return const SizedBox.shrink();
-                    }
-                    return _AiModelSelector(
-                      allModels: allModels,
-                      current: current,
-                      onChanged: _rememberModel,
-                    );
-                  },
-                ),
+                child: _buildBody(context, theme, chatState, chatNotifier),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  /// 工具栏操作按钮（两种模式共用）
+  List<Widget> _buildToolbarActions(
+    BuildContext context,
+    ThemeData theme,
+    TopicAiChatState chatState,
+    TopicAiChatNotifier chatNotifier,
+  ) {
+    return [
+      Consumer(
+        builder: (context, ref, _) {
+          final scope = ref.watch(
+            topicAiContextScopeProvider(widget.topicId),
+          );
+          return AiContextSelector(
+            currentScope: scope,
+            onChanged: _onScopeChanged,
+          );
+        },
+      ),
+      if (chatState.messages.isNotEmpty)
+        IconButton(
+          icon: const Icon(Icons.check_box_outlined),
+          tooltip: context.l10n.ai_multiSelectExport,
+          iconSize: 20,
+          onPressed: _enterSelectionMode,
+        ),
+      SwipeDismissiblePopupMenuButton<String>(
+        icon: const Icon(Icons.more_vert),
+        tooltip: context.l10n.ai_moreTooltip,
+        iconSize: 20,
+        onSelected: (value) {
+          switch (value) {
+            case 'new_session':
+              chatNotifier.createNewSession();
+            case 'history':
+              _showSessionHistory(context, chatState, chatNotifier);
+            case 'clear':
+              _confirmClear(context, chatNotifier);
+          }
+        },
+        itemBuilder: (context) => [
+          PopupMenuItem(
+            value: 'new_session',
+            child: ListTile(
+              leading: const Icon(Icons.add_comment_outlined),
+              title: Text(context.l10n.ai_newSession),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+          if (chatState.sessions.isNotEmpty)
+            PopupMenuItem(
+              value: 'history',
+              child: ListTile(
+                leading: const Icon(Icons.history),
+                title: Text(context.l10n.ai_sessionHistory),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          if (chatState.messages.isNotEmpty)
+            PopupMenuItem(
+              value: 'clear',
+              child: ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: Text(context.l10n.ai_clearChat),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+        ],
+      ),
+    ];
+  }
+
+  /// 聊天内容主体（两种模式共用）
+  Widget _buildBody(
+    BuildContext context,
+    ThemeData theme,
+    TopicAiChatState chatState,
+    TopicAiChatNotifier chatNotifier,
+  ) {
+    return Column(
+      children: [
+        // 上下文加载提示
+        if (_isLoadingContext)
+          LinearProgressIndicator(
+            minHeight: 2,
+            color: theme.colorScheme.primary,
+          ),
+
+        // 聊天主要内容区
+        Expanded(
+          child: chatState.messages.isEmpty
+              ? _buildEmptyState(context, theme)
+              : _buildMessageList(context, ref, chatState),
+        ),
+
+        // 底部输入区
+        AiChatInput(
+          isGenerating: chatState.isGenerating,
+          onSend: (content) {
+            final scope = ref.read(
+              topicAiContextScopeProvider(widget.topicId),
+            );
+            final model = _currentModel();
+            if (model == null) return;
+            _rememberModel(model);
+            chatNotifier.sendMessage(
+              content,
+              scope,
+              selectedModel: model,
+            );
+          },
+          onStop: chatNotifier.stopGeneration,
+          bottomLeading: Consumer(
+            builder: (context, ref, _) {
+              final allModels = ref.watch(allAvailableAiModelsProvider);
+              final selected = ref.watch(
+                topicSelectedAiModelProvider(widget.topicId),
+              );
+              final lastUsedModel = ref.watch(
+                lastUsedAiAssistantModelProvider,
+              );
+              final defaultModel = ref.watch(defaultAiModelProvider);
+              final current = selected ?? defaultModel ?? lastUsedModel;
+              if (allModels.length <= 1 || current == null) {
+                return const SizedBox.shrink();
+              }
+              return _AiModelSelector(
+                allModels: allModels,
+                current: current,
+                onChanged: _rememberModel,
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 

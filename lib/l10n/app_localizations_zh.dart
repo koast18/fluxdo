@@ -5464,6 +5464,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reading_expandRelatedLinksDesc => '帖子中的相关链接区域默认展开显示';
 
   @override
+  String get reading_aiSwipeEntry => 'AI 助手滑动入口';
+
+  @override
+  String get reading_aiSwipeEntryDesc => '在话题详情页向左滑动打开 AI 助手';
+
+  @override
   String get schemeVariant_tonalSpot => '柔和色调';
 
   @override
@@ -10932,6 +10938,12 @@ class AppLocalizationsZhHk extends AppLocalizationsZh {
   String get reading_expandRelatedLinksDesc => '帖子中的相關鏈接區域預設展開顯示';
 
   @override
+  String get reading_aiSwipeEntry => 'AI 助手滑動入口';
+
+  @override
+  String get reading_aiSwipeEntryDesc => '在話題詳情頁向左滑動打開 AI 助手';
+
+  @override
   String get schemeVariant_tonalSpot => '柔和色調';
 
   @override
@@ -16398,6 +16410,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get reading_expandRelatedLinksDesc => '帖子中的相關連結區域預設展開顯示';
+
+  @override
+  String get reading_aiSwipeEntry => 'AI 助手滑動入口';
+
+  @override
+  String get reading_aiSwipeEntryDesc => '在話題詳情頁向左滑動開啟 AI 助手';
 
   @override
   String get schemeVariant_tonalSpot => '柔和色調';

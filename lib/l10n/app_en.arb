@@ -1865,6 +1865,8 @@
   "reading_title": "Reading Settings",
   "reading_expandRelatedLinks": "Expand related links by default",
   "reading_expandRelatedLinksDesc": "Show related links expanded in posts",
+  "reading_aiSwipeEntry": "AI Assistant swipe entry",
+  "reading_aiSwipeEntryDesc": "Swipe left in topic detail to open AI Assistant",
 
   "schemeVariant_tonalSpot": "Tonal Spot",
   "schemeVariant_fidelity": "Fidelity",
