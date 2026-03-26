@@ -3053,5 +3053,8 @@
   "hcaptcha_webviewTitle": "hCaptcha 無障礙",
   "hcaptcha_done": "完成",
   "hcaptcha_pasteLink": "貼上登錄鏈接",
-  "hcaptcha_pasteLinkInvalid": "剪貼板中沒有有效的 hCaptcha 鏈接"
+  "hcaptcha_pasteLinkInvalid": "剪貼板中沒有有效的 hCaptcha 鏈接",
+
+  "migration_title": "資料升級",
+  "migration_cookieUpgrade": "正在升級 Cookie 儲存..."
 }

@@ -12,6 +12,7 @@ import '../services/preloaded_data_service.dart';
 import '../services/discourse/discourse_service.dart';
 import '../services/emoji_handler.dart';
 import '../services/log/log_writer.dart';
+import '../services/migration_service.dart';
 import '../utils/error_utils.dart';
 import '../widgets/common/error_view.dart';
 
@@ -48,6 +49,11 @@ class _PreheatGateState extends State<PreheatGate> {
 
   Future<bool> _preload() async {
     try {
+      // 迁移已在 main() 中执行完毕，这里只展示提示
+      if (MigrationService.didMigrate && mounted) {
+        _showMigrationToast();
+      }
+
       await PreloadedDataService().ensureLoaded();
 
       DiscourseService().getEnabledReactions();
@@ -60,6 +66,18 @@ class _PreheatGateState extends State<PreheatGate> {
       _error = e;
       return false;
     }
+  }
+
+  void _showMigrationToast() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(S.current.migration_cookieUpgrade),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    });
   }
 
   void _retry() {

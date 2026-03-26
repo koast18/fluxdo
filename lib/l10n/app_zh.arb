@@ -2028,5 +2028,8 @@
   "hcaptcha_webviewTitle": "hCaptcha 无障碍",
   "hcaptcha_done": "完成",
   "hcaptcha_pasteLink": "粘贴登录链接",
-  "hcaptcha_pasteLinkInvalid": "剪贴板中没有有效的 hCaptcha 链接"
+  "hcaptcha_pasteLinkInvalid": "剪贴板中没有有效的 hCaptcha 链接",
+
+  "migration_title": "数据升级",
+  "migration_cookieUpgrade": "正在升级 Cookie 存储..."
 }

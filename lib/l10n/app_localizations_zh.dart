@@ -5417,6 +5417,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hcaptcha_pasteLinkInvalid => '剪贴板中没有有效的 hCaptcha 链接';
+
+  @override
+  String get migration_title => '数据升级';
+
+  @override
+  String get migration_cookieUpgrade => '正在升级 Cookie 存储...';
 }
 
 /// The translations for Chinese, as used in Hong Kong (`zh_HK`).
@@ -10711,6 +10717,12 @@ class AppLocalizationsZhHk extends AppLocalizationsZh {
 
   @override
   String get hcaptcha_pasteLinkInvalid => '剪貼板中沒有有效的 hCaptcha 鏈接';
+
+  @override
+  String get migration_title => '資料升級';
+
+  @override
+  String get migration_cookieUpgrade => '正在升級 Cookie 儲存...';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -16005,4 +16017,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get hcaptcha_pasteLinkInvalid => '剪貼簿中沒有有效的 hCaptcha 連結';
+
+  @override
+  String get migration_title => '資料升級';
+
+  @override
+  String get migration_cookieUpgrade => '正在升級 Cookie 儲存...';
 }

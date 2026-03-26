@@ -1846,5 +1846,8 @@
   "hcaptcha_webviewTitle": "hCaptcha Accessibility",
   "hcaptcha_done": "Done",
   "hcaptcha_pasteLink": "Paste login link",
-  "hcaptcha_pasteLinkInvalid": "No valid hCaptcha link found in clipboard"
+  "hcaptcha_pasteLinkInvalid": "No valid hCaptcha link found in clipboard",
+
+  "migration_title": "Data Upgrade",
+  "migration_cookieUpgrade": "Upgrading cookie storage..."
 }

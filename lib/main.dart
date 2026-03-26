@@ -50,6 +50,7 @@ import 'services/log/json_file_handler.dart';
 import 'services/log/log_writer.dart';
 import 'services/log/logger_utils.dart';
 import 'services/download_service.dart';
+import 'services/migration_service.dart';
 import 'services/navigation/app_route_observer.dart';
 import 'services/window_state_service.dart';
 import 'services/windows_webview_environment_service.dart';
@@ -196,6 +197,9 @@ Future<void> main() async {
       ]);
     }
   }
+
+  // 数据迁移：在所有网络请求之前执行
+  await MigrationService.runAll(prefs);
 
   // 提前触发预加载数据请求，与 runApp 并行执行
   // PreheatGate 中的 ensureLoaded() 会复用这个已在进行的请求

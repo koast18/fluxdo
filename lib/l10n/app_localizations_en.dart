@@ -5541,4 +5541,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get hcaptcha_pasteLinkInvalid =>
       'No valid hCaptcha link found in clipboard';
+
+  @override
+  String get migration_title => 'Data Upgrade';
+
+  @override
+  String get migration_cookieUpgrade => 'Upgrading cookie storage...';
 }

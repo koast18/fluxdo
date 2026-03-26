@@ -10102,6 +10102,18 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'剪贴板中没有有效的 hCaptcha 链接'**
   String get hcaptcha_pasteLinkInvalid;
+
+  /// No description provided for @migration_title.
+  ///
+  /// In zh, this message translates to:
+  /// **'数据升级'**
+  String get migration_title;
+
+  /// No description provided for @migration_cookieUpgrade.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在升级 Cookie 存储...'**
+  String get migration_cookieUpgrade;
 }
 
 class _AppLocalizationsDelegate
