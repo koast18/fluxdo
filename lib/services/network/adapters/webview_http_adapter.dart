@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../../../constants.dart';
+import '../browser_session_service.dart';
 import '../cookie/cookie_jar_service.dart';
 import '../../webview_settings.dart';
 import '../../windows_webview_environment_service.dart';
@@ -19,6 +20,7 @@ class WebViewHttpAdapter implements HttpClientAdapter {
   // 用于接收 JS 回调结果
   final Map<String, Completer<String>> _pendingRequests = {};
   int _requestId = 0;
+  final BrowserSessionService _browserSession = BrowserSessionService.instance;
 
   /// 初始化 WebView
   Future<void> initialize() async {
@@ -98,8 +100,10 @@ class WebViewHttpAdapter implements HttpClientAdapter {
     final requestUri = Uri.parse(url);
     final baseUri = Uri.parse(AppConstants.baseUrl);
     final shouldSyncAppCookies = _shouldSyncAppCookies(requestUri, baseUri);
+    final preferBrowserSession =
+        options.extra['preferBrowserSession'] == true;
 
-    if (shouldSyncAppCookies) {
+    if (shouldSyncAppCookies && !preferBrowserSession) {
       await CookieJarService().syncToWebView(
         currentUrl: url,
         controller: _controller,
@@ -277,7 +281,8 @@ class WebViewHttpAdapter implements HttpClientAdapter {
     debugPrint('[WebViewAdapter] Response: $statusCode (binary: $isBase64)');
 
     if (shouldSyncAppCookies) {
-      await CookieJarService().syncFromWebView(
+      await _browserSession.syncBoundarySession(
+        source: 'webview_adapter_response',
         currentUrl: url,
         controller: _controller,
       );

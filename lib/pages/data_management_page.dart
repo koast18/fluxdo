@@ -188,7 +188,7 @@ class _CacheManagementSectionState
   Future<void> _doClearCookies() async {
     final cookieJarService = CookieJarService();
     final cfClearanceCookie = await cookieJarService.getCfClearanceCookie();
-    await cookieJarService.cookieJar.deleteAll();
+    await cookieJarService.clearAll();
     if (cfClearanceCookie != null) {
       await cookieJarService.restoreCfClearance(cfClearanceCookie);
     }

@@ -3,6 +3,7 @@ import 'dart:io' as io;
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../constants.dart';
+import 'network/browser_session_service.dart';
 import 'network/cookie/cookie_jar_service.dart';
 import 'local_notification_service.dart'; // 用于获取全局 navigatorKey
 import 'cf_challenge_logger.dart';
@@ -365,6 +366,7 @@ class CfChallengePage extends StatefulWidget {
 }
 
 class _CfChallengePageState extends State<CfChallengePage> {
+  final BrowserSessionService _browserSession = BrowserSessionService.instance;
   InAppWebViewController? _controller;
   bool _isLoading = true;
   double _progress = 0;
@@ -590,9 +592,9 @@ class _CfChallengePageState extends State<CfChallengePage> {
         reason: 'new cf_clearance detected and page passed challenge',
       );
       await _syncLiveCookiesToCookieJar();
-      await CookieJarService().syncFromWebView(
+      await _browserSession.syncCfBoundary(
         controller: _controller,
-        cookieNames: const {'cf_clearance'},
+        currentUrl: widget.verifyUrl,
       );
       // 验证 cf_clearance 是否真正写入了 CookieJar
       final synced = await CookieJarService().getCfClearance();
@@ -689,9 +691,9 @@ class _CfChallengePageState extends State<CfChallengePage> {
             reason: 'no challenge but new cf_clearance detected',
           );
           await _syncLiveCookiesToCookieJar();
-          await CookieJarService().syncFromWebView(
+          await _browserSession.syncCfBoundary(
             controller: _controller,
-            cookieNames: const {'cf_clearance'},
+            currentUrl: widget.verifyUrl,
           );
           _timeoutTimer?.cancel();
           if (mounted) _finish(true);
@@ -737,9 +739,9 @@ class _CfChallengePageState extends State<CfChallengePage> {
         reason: 'polling detected new cf_clearance',
       );
       await _syncLiveCookiesToCookieJar();
-      await CookieJarService().syncFromWebView(
+      await _browserSession.syncCfBoundary(
         controller: _controller,
-        cookieNames: const {'cf_clearance'},
+        currentUrl: widget.verifyUrl,
       );
       _timeoutTimer?.cancel();
       if (mounted) _finish(true);

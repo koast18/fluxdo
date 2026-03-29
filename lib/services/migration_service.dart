@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'network/cookie/cookie_jar_service.dart';
+import 'network/cookie/android_cdp_feature.dart';
 
 /// 迁移项定义
 class Migration {
@@ -60,7 +61,49 @@ class MigrationService {
         requiresRelogin = true;
       },
     ),
+    // v3: 浏览器优先双通道切换 — 对存量用户执行一次全量 Cookie 清理，避免旧污染状态残留
+    Migration(
+      key: 'cookie_clean_slate_v3',
+      name: 'Cookie clean slate v3',
+      shouldRun: (prefs) async {
+        if (_hasLegacyCookieMigrationMarker(prefs)) return true;
+        try {
+          final jar = CookieJarService();
+          if (!jar.isInitialized) await jar.initialize();
+          final token = await jar.getTToken();
+          final cfClearance = await jar.getCfClearance();
+          return (token != null && token.isNotEmpty) ||
+              (cfClearance != null && cfClearance.isNotEmpty) ||
+              prefs.getString('linux_do_username')?.isNotEmpty == true;
+        } catch (_) {
+          return prefs.getString('linux_do_username')?.isNotEmpty == true;
+        }
+      },
+      run: () async {
+        final jar = CookieJarService();
+        if (!jar.isInitialized) await jar.initialize();
+        await jar.clearAll();
+        requiresRelogin = true;
+      },
+    ),
+    Migration(
+      key: 'android_native_cdp_default_off_v1',
+      name: 'Android native CDP default off',
+      shouldRun: (prefs) async {
+        return defaultTargetPlatform == TargetPlatform.android &&
+            prefs.containsKey(AndroidCdpFeature.prefKey);
+      },
+      run: () async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(AndroidCdpFeature.prefKey, false);
+      },
+    ),
   ];
+
+  static bool _hasLegacyCookieMigrationMarker(SharedPreferences prefs) {
+    return prefs.getBool('cookie_clean_slate_v2') == true ||
+        prefs.getBool('cookie_domain_migration_v2') == true;
+  }
 
   /// 在 main() 中调用，在所有网络服务启动之前执行
   static Future<void> runAll(SharedPreferences prefs) async {

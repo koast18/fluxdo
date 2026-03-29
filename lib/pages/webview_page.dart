@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../utils/link_launcher.dart';
 import '../services/toast_service.dart';
 import '../services/app_link_service.dart';
-import '../constants.dart';
 import '../services/network/cookie/cookie_jar_service.dart';
 import '../services/network/cookie/cookie_write_through.dart';
 import '../services/webview_settings.dart';
@@ -278,13 +277,6 @@ class _WebViewPageState extends ConsumerState<WebViewPage> {
                           _currentTitle = title;
                         }
                       });
-                      if (urlString != null &&
-                          _shouldSyncCookiesForUrl(urlString)) {
-                        await CookieJarService().syncFromWebView(
-                          currentUrl: urlString,
-                          controller: controller,
-                        );
-                      }
                       if (widget.injectCss != null) {
                         await controller.injectCSSCode(
                           source: widget.injectCss!,
@@ -306,13 +298,6 @@ class _WebViewPageState extends ConsumerState<WebViewPage> {
                         _canGoBack = canGoBack;
                         _canGoForward = canGoForward;
                       });
-                      if (urlString != null &&
-                          _shouldSyncCookiesForUrl(urlString)) {
-                        await CookieJarService().syncFromWebView(
-                          currentUrl: urlString,
-                          controller: controller,
-                        );
-                      }
                     },
                     onTitleChanged: (controller, title) {
                       if (title != null && title.isNotEmpty) {
@@ -394,16 +379,6 @@ class _WebViewPageState extends ConsumerState<WebViewPage> {
     if (io.Platform.isWindows) return; // Windows 在 onWebViewCreated 中处理
     await CookieWriteThrough.instance.barrier();
     await CookieJarService().syncToWebView(currentUrl: widget.url);
-  }
-
-  bool _shouldSyncCookiesForUrl(String url) {
-    final targetUri = Uri.tryParse(url);
-    final baseUri = Uri.tryParse(AppConstants.baseUrl);
-    if (targetUri == null || baseUri == null) return false;
-    final targetHost = targetUri.host;
-    final baseHost = baseUri.host;
-    if (targetHost.isEmpty || baseHost.isEmpty) return false;
-    return targetHost == baseHost || targetHost.endsWith('.$baseHost');
   }
 
   void _handleMenuAction(String action) {

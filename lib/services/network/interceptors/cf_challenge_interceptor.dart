@@ -6,6 +6,7 @@ import '../../cf_challenge_service.dart';
 import '../../cf_challenge_logger.dart';
 import '../../cf_clearance_refresh_service.dart';
 import '../../app_logger.dart';
+import '../browser_session_service.dart';
 import '../cookie/cookie_jar_service.dart';
 import '../../../l10n/s.dart';
 import '../exceptions/api_exception.dart';
@@ -17,6 +18,7 @@ class CfChallengeInterceptor extends Interceptor {
 
   final Dio dio;
   final CookieJarService cookieJarService;
+  final BrowserSessionService _browserSession = BrowserSessionService.instance;
 
   /// 共享的 cookie 同步 Future：验证成功后只执行一次 sync
   static Future<bool>? _activeSyncFuture;
@@ -48,16 +50,14 @@ class CfChallengeInterceptor extends Interceptor {
 
     // CookieJar 中未找到 cf_clearance，走 WebView 同步兜底
     await Future.delayed(const Duration(milliseconds: 1500));
-    await cookieJarService.syncFromWebView(cookieNames: const {'cf_clearance'});
+    await _browserSession.syncCfBoundary();
 
     for (var i = 0; i < 3; i++) {
       cfClearance = await cookieJarService.getCfClearance();
       if (cfClearance != null && cfClearance.isNotEmpty) break;
       debugPrint('[Dio] cf_clearance not found, retry ${i + 1}/3...');
       await Future.delayed(const Duration(milliseconds: 500));
-      await cookieJarService.syncFromWebView(
-        cookieNames: const {'cf_clearance'},
-      );
+      await _browserSession.syncCfBoundary();
     }
 
     if (cfClearance == null || cfClearance.isEmpty) {

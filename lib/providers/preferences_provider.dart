@@ -158,7 +158,7 @@ class PreferencesNotifier extends StateNotifier<AppPreferences> {
             shareImageThemeIndex: _prefs.getInt(_shareImageThemeIndexKey) ?? 0,
             autoFillLogin: _prefs.getBool(_autoFillLoginKey) ?? true,
             crashlytics: _prefs.getBool(_crashlyticsKey) ?? true,
-            androidNativeCdp: _prefs.getBool(_androidNativeCdpKey) ?? true,
+            androidNativeCdp: _prefs.getBool(_androidNativeCdpKey) ?? false,
             portraitLock: _prefs.getBool(_portraitLockKey) ?? false,
             hideBarOnScroll: _prefs.getBool(_hideBarOnScrollKey) ?? true,
             clearCacheOnExit: _prefs.getBool(_clearCacheOnExitKey) ?? false,

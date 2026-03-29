@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../log/log_writer.dart';
 import 'cookie_jar_service.dart';
+import 'session_snapshot_service.dart';
 import 'cookie_write_through.dart';
 
 /// App-specific CookieManager.
@@ -391,6 +392,11 @@ class AppCookieManager extends Interceptor {
         '${resolvedUri.toString()}',
       );
     }
+
+    SessionSnapshotService.instance.mergeFromCookies(
+      filteredCookies,
+      source: 'response_set_cookie',
+    );
 
     // 实时推送关键 cookie 到 WebView（不阻塞 Dio 响应链）
     // 同时传递原始 Set-Cookie 头，优先用 raw 写入保留 host-only 等语义

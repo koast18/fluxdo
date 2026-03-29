@@ -13,6 +13,7 @@ import '../../windows_webview_environment_service.dart';
 import 'cookie_sync_context.dart';
 import 'cookie_sync_coordinator.dart';
 import 'cookie_value_codec.dart';
+import 'session_snapshot_service.dart';
 import 'strategy/platform_cookie_strategy.dart';
 
 export 'cookie_value_codec.dart';
@@ -71,6 +72,7 @@ class CookieJarService {
       debugPrint('[CookieJar] Initialized with path: $cookiePath');
 
       await _migrateCookieStorage();
+      await refreshSessionSnapshot(source: 'initialize');
     } catch (e) {
       debugPrint(
         '[CookieJar] Failed to create persistent storage, using memory: $e',
@@ -80,6 +82,7 @@ class CookieJarService {
 
       final strategy = PlatformCookieStrategy.create();
       _coordinator = CookieSyncCoordinator(jar: this, strategy: strategy);
+      await refreshSessionSnapshot(source: 'initialize_memory');
     }
   }
 
@@ -147,6 +150,7 @@ class CookieJarService {
       cookieNames: cookieNames,
     );
     await _coordinator!.syncFromWebView(ctx);
+    await refreshSessionSnapshot(source: 'sync_from_webview');
   }
 
   /// 从 CookieJar 同步 Cookie 到 WebView
@@ -218,6 +222,32 @@ class CookieJarService {
       ctx,
       cookieNames: cookieNames,
     );
+    await refreshSessionSnapshot(source: 'sync_critical_from_controller');
+  }
+
+  /// 显式边界同步：只在登录成功、CF 成功、退出 WebView 等关键时机回收会话。
+  Future<void> syncSessionSnapshotFromWebView({
+    String? currentUrl,
+    InAppWebViewController? controller,
+    Set<String> cookieNames = const {'_t', '_forum_session', 'cf_clearance'},
+  }) async {
+    if (!_initialized) await initialize();
+
+    if (controller != null &&
+        (io.Platform.isWindows || io.Platform.isLinux || io.Platform.isAndroid)) {
+      await syncCriticalCookiesFromController(
+        controller,
+        currentUrl: currentUrl,
+        cookieNames: cookieNames,
+      );
+      return;
+    }
+
+    await syncFromWebView(
+      currentUrl: currentUrl,
+      controller: controller,
+      cookieNames: cookieNames,
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -227,6 +257,11 @@ class CookieJarService {
   /// 获取指定 Cookie 的值
   Future<String?> getCookieValue(String name) async {
     if (!_initialized) await initialize();
+
+    final snapshotValue = SessionSnapshotService.instance.getCookieValue(name);
+    if (snapshotValue != null && snapshotValue.isNotEmpty) {
+      return snapshotValue;
+    }
 
     try {
       final uri = Uri.parse(AppConstants.baseUrl);
@@ -325,6 +360,10 @@ class CookieJarService {
       }
 
       await _cookieJar!.saveFromResponse(uri, [cookie]);
+      SessionSnapshotService.instance.mergeFromCookies(
+        [cookie],
+        source: 'set_cookie:$name',
+      );
     } catch (e) {
       debugPrint('[CookieJar] Failed to set cookie $name: $e');
     }
@@ -366,6 +405,10 @@ class CookieJarService {
 
         if (expiredCookies.isNotEmpty) {
           await _cookieJar!.saveFromResponse(hostUri, expiredCookies);
+          SessionSnapshotService.instance.mergeFromCookies(
+            expiredCookies,
+            source: 'delete_cookie:$name',
+          );
         }
       }
 
@@ -391,6 +434,7 @@ class CookieJarService {
 
     try {
       await _cookieJar!.deleteAll();
+      SessionSnapshotService.instance.clear(source: 'clear_all');
 
       // Android：加 timeout 保护
       if (io.Platform.isAndroid) {
@@ -538,8 +582,26 @@ class CookieJarService {
     try {
       final uri = Uri.parse(AppConstants.baseUrl);
       await _cookieJar!.saveFromResponse(uri, [cookie]);
+      SessionSnapshotService.instance.mergeFromCookies(
+        [cookie],
+        source: 'restore_cf_clearance',
+      );
     } catch (e) {
       debugPrint('[CookieJar] Failed to restore cf_clearance: $e');
+    }
+  }
+
+  Future<void> refreshSessionSnapshot({String source = 'jar_refresh'}) async {
+    if (!_initialized) await initialize();
+    try {
+      final uri = Uri.parse(AppConstants.baseUrl);
+      final cookies = await _cookieJar!.loadForRequest(uri);
+      SessionSnapshotService.instance.replaceFromCookies(
+        cookies,
+        source: source,
+      );
+    } catch (e) {
+      debugPrint('[CookieJar] Failed to refresh session snapshot: $e');
     }
   }
 

@@ -8,13 +8,13 @@ class AndroidCdpFeature {
   AndroidCdpFeature._();
 
   static const String prefKey = 'pref_android_native_cdp';
-  static bool _enabled = true;
+  static bool _enabled = false;
   static bool _initialized = false;
 
   static bool get isEnabled => Platform.isAndroid && _enabled;
 
   static Future<void> initialize(SharedPreferences prefs) async {
-    _enabled = prefs.getBool(prefKey) ?? true;
+    _enabled = prefs.getBool(prefKey) ?? false;
     _initialized = true;
     AppLogger.info(
       'Android native CDP ${_enabled ? 'enabled' : 'disabled'}',

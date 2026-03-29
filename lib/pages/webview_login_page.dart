@@ -11,6 +11,7 @@ import '../services/credential_store_service.dart';
 import '../services/auth_session.dart';
 import '../services/discourse/discourse_service.dart';
 import '../services/preloaded_data_service.dart';
+import '../services/network/browser_session_service.dart';
 import '../services/network/cookie/cookie_jar_service.dart';
 import '../services/network/cookie/cookie_sync_service.dart';
 import '../services/network/cookie/cookie_write_through.dart';
@@ -37,6 +38,7 @@ class WebViewLoginPage extends ConsumerStatefulWidget {
 
 class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
   final _service = DiscourseService();
+  final _browserSession = BrowserSessionService.instance;
   final _cookieJar = CookieJarService();
   final _credentialStore = CredentialStoreService();
   final Uri _baseUri = Uri.parse(AppConstants.baseUrl);
@@ -399,10 +401,9 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
           _isLoading = true;
         });
       }
-      await _cookieJar.syncCriticalCookiesFromController(
-        controller,
+      await _browserSession.syncLoginBoundary(
+        controller: controller,
         currentUrl: currentUrl,
-        cookieNames: const {'_t', '_forum_session', 'cf_clearance'},
       );
       final tToken = await _readTTokenFromWebView(
         controller,
@@ -447,15 +448,10 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
     await _service.saveUsername(username);
     await _syncCsrfFromPage(controller);
 
-    // 先切断旧请求，防止 syncFromWebView 期间旧响应的 Set-Cookie 写入竞争
+    // 先切断旧请求，防止登录收口期间旧响应的 Set-Cookie 写入竞争
     AuthSession().advance();
 
-    await _cookieJar.syncCriticalCookiesFromController(
-      controller,
-      currentUrl: currentUrl,
-      cookieNames: const {'_t', '_forum_session', 'cf_clearance'},
-    );
-    await _cookieJar.syncFromWebView(
+    await _browserSession.syncLoginBoundary(
       currentUrl: currentUrl,
       controller: controller,
     );

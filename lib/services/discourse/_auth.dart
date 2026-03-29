@@ -129,6 +129,31 @@ mixin _AuthMixin on _DiscourseServiceBase {
             }
           }
 
+          if (RequestSensitivityPolicy.shouldAttemptBrowserFallback(
+            error.requestOptions,
+            statusCode: error.response?.statusCode,
+          )) {
+            try {
+              final fallbackResponse =
+                  await BrowserRequestFallbackService.instance.retry(
+                error.requestOptions,
+              );
+              await BrowserSessionService.instance.refreshSnapshot(
+                source: 'browser_fallback_success',
+              );
+              return handler.resolve(fallbackResponse);
+            } on DioException catch (fallbackError) {
+              debugPrint(
+                '[Auth] Browser fallback failed: '
+                '${fallbackError.requestOptions.method} '
+                '${fallbackError.requestOptions.uri} '
+                '-> ${fallbackError.response?.statusCode}',
+              );
+            } catch (fallbackError) {
+              debugPrint('[Auth] Browser fallback failed: $fallbackError');
+            }
+          }
+
           final loggedOut = error.response?.headers.value(
             'discourse-logged-out',
           );
@@ -308,7 +333,7 @@ mixin _AuthMixin on _DiscourseServiceBase {
   }
 
   /// 登录成功后通知监听者（应在预加载数据就绪后调用）
-  /// Cookie 写入由 syncFromWebView() 统一处理。
+  /// 会话写入由显式边界同步统一处理。
   void onLoginSuccess(String tToken) {
     _tToken = tToken;
     _credentialsLoaded = false;
