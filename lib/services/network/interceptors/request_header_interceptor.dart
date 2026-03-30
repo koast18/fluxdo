@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../constants.dart';
-import '../cookie/cookie_sync_service.dart';
+import '../cookie/csrf_token_service.dart';
 
 /// 请求头拦截器
 /// 负责设置 User-Agent 和 CSRF Token
@@ -9,7 +9,7 @@ import '../cookie/cookie_sync_service.dart';
 class RequestHeaderInterceptor extends Interceptor {
   RequestHeaderInterceptor(this._cookieSync);
 
-  final CookieSyncService _cookieSync;
+  final CsrfTokenService _cookieSync;
 
   @override
   Future<void> onRequest(

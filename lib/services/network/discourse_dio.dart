@@ -6,7 +6,7 @@ import '../../constants.dart';
 import 'adapters/platform_adapter.dart';
 import 'cookie/app_cookie_manager.dart';
 import 'cookie/cookie_jar_service.dart';
-import 'cookie/cookie_sync_service.dart';
+import 'cookie/csrf_token_service.dart';
 import 'interceptors/cf_challenge_interceptor.dart';
 import 'interceptors/request_scheduler_interceptor.dart';
 import 'interceptors/session_guard_interceptor.dart';
@@ -82,7 +82,7 @@ class DiscourseDio {
     }
 
     // 7. 请求头拦截器
-    dio.interceptors.add(RequestHeaderInterceptor(CookieSyncService()));
+    dio.interceptors.add(RequestHeaderInterceptor(CsrfTokenService()));
 
     // 8. 重定向拦截器
     dio.interceptors.add(RedirectInterceptor(dio));

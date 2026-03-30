@@ -7,7 +7,7 @@ import '../constants.dart';
 import '../models/topic.dart';
 import '../models/category.dart';
 import 'network/discourse_dio.dart';
-import 'network/cookie/cookie_sync_service.dart';
+import 'network/cookie/csrf_token_service.dart';
 import 'cf_challenge_service.dart';
 import 'cf_clearance_refresh_service.dart';
 
@@ -19,7 +19,7 @@ class PreloadedDataService {
   factory PreloadedDataService() => _instance;
 
   final Dio _dio;
-  final CookieSyncService _cookieSync = CookieSyncService();
+  final CsrfTokenService _cookieSync = CsrfTokenService();
   final CfChallengeService _cfChallenge = CfChallengeService();
 
   // 缓存的预加载数据

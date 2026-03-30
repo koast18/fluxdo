@@ -129,31 +129,6 @@ mixin _AuthMixin on _DiscourseServiceBase {
             }
           }
 
-          if (RequestSensitivityPolicy.shouldAttemptBrowserFallback(
-            error.requestOptions,
-            statusCode: error.response?.statusCode,
-          )) {
-            try {
-              final fallbackResponse =
-                  await BrowserRequestFallbackService.instance.retry(
-                error.requestOptions,
-              );
-              await BrowserSessionService.instance.refreshSnapshot(
-                source: 'browser_fallback_success',
-              );
-              return handler.resolve(fallbackResponse);
-            } on DioException catch (fallbackError) {
-              debugPrint(
-                '[Auth] Browser fallback failed: '
-                '${fallbackError.requestOptions.method} '
-                '${fallbackError.requestOptions.uri} '
-                '-> ${fallbackError.response?.statusCode}',
-              );
-            } catch (fallbackError) {
-              debugPrint('[Auth] Browser fallback failed: $fallbackError');
-            }
-          }
-
           final loggedOut = error.response?.headers.value(
             'discourse-logged-out',
           );

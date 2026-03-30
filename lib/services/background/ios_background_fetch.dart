@@ -6,7 +6,7 @@ import 'package:workmanager/workmanager.dart';
 
 import '../local_notification_service.dart';
 import '../network/cookie/cookie_jar_service.dart';
-import '../network/cookie/cookie_sync_service.dart';
+import '../network/cookie/csrf_token_service.dart';
 import '../network/discourse_dio.dart';
 import '../../models/notification.dart';
 
@@ -28,7 +28,7 @@ void callbackDispatcher() {
 
       // 1. 初始化 Cookie 相关服务
       await CookieJarService().initialize();
-      await CookieSyncService().init();
+      await CsrfTokenService().init();
 
       // 2. 从 SharedPreferences 读取 userId 和 lastMessageId
       final prefs = await SharedPreferences.getInstance();

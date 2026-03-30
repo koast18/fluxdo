@@ -68,7 +68,7 @@ class WebViewSettings {
   }
 
   /// Headless WebView 配置（后台同步用，轻量）
-  /// 用于 CookieSyncService、WebViewHttpAdapter、CF 自动验证等
+  /// 用于 CsrfTokenService、WebViewHttpAdapter、CF 自动验证等
   static InAppWebViewSettings get headless => InAppWebViewSettings(
     javaScriptEnabled: true,
     sharedCookiesEnabled: true,

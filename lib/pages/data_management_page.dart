@@ -184,7 +184,7 @@ class _CacheManagementSectionState
     }
   }
 
-  /// 清除 Cookie 文件和内存（保留 cf_clearance）
+  /// 清除 Cookie（保留 cf_clearance）
   Future<void> _doClearCookies() async {
     final cookieJarService = CookieJarService();
     final cfClearanceCookie = await cookieJarService.getCfClearanceCookie();

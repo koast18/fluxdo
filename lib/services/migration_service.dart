@@ -98,6 +98,20 @@ class MigrationService {
         await prefs.setBool(AndroidCdpFeature.prefKey, false);
       },
     ),
+    // v4: storageKey 放宽（去掉 hostOnly）— 清理旧 cookie 防止多副本残留
+    Migration(
+      key: 'cookie_relaxed_key_v4',
+      name: 'Relaxed storageKey migration',
+      shouldRun: (prefs) async {
+        return prefs.getString('linux_do_username')?.isNotEmpty == true;
+      },
+      run: () async {
+        final jar = CookieJarService();
+        if (!jar.isInitialized) await jar.initialize();
+        await jar.clearAll();
+        requiresRelogin = true;
+      },
+    ),
   ];
 
   static bool _hasLegacyCookieMigrationMarker(SharedPreferences prefs) {

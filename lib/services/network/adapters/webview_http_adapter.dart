@@ -4,8 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../../../constants.dart';
-import '../browser_session_service.dart';
-import '../cookie/cookie_jar_service.dart';
+import '../cookie/raw_set_cookie_queue.dart';
 import '../../webview_settings.dart';
 import '../../windows_webview_environment_service.dart';
 
@@ -20,7 +19,6 @@ class WebViewHttpAdapter implements HttpClientAdapter {
   // 用于接收 JS 回调结果
   final Map<String, Completer<String>> _pendingRequests = {};
   int _requestId = 0;
-  final BrowserSessionService _browserSession = BrowserSessionService.instance;
 
   /// 初始化 WebView
   Future<void> initialize() async {
@@ -100,24 +98,13 @@ class WebViewHttpAdapter implements HttpClientAdapter {
     final requestUri = Uri.parse(url);
     final baseUri = Uri.parse(AppConstants.baseUrl);
     final shouldSyncAppCookies = _shouldSyncAppCookies(requestUri, baseUri);
-    final preferBrowserSession =
-        options.extra['preferBrowserSession'] == true;
 
-    if (shouldSyncAppCookies && !preferBrowserSession) {
-      await CookieJarService().syncToWebView(
-        currentUrl: url,
-        controller: _controller,
-      );
-      if (_controller != null) {
-        await CookieJarService().syncToWebViewViaController(
-          _controller!,
-          currentUrl: url,
-        );
-      }
+    if (shouldSyncAppCookies) {
+      await RawSetCookieQueue.instance.flushToWebView();
     }
 
     // 非应用站点的备选路径：根据请求头尽力补 Cookie。
-    // 应用站点统一依赖 CookieJarService 的 WebView 同步，避免 header 与 CookieStore 脱节。
+    // 应用站点统一依赖 RawSetCookieQueue 的 WebView 同步，避免 header 与 CookieStore 脱节。
     final cookieHeader = options.headers['Cookie']?.toString();
     if (!shouldSyncAppCookies &&
         cookieHeader != null &&
@@ -279,14 +266,6 @@ class WebViewHttpAdapter implements HttpClientAdapter {
     }
 
     debugPrint('[WebViewAdapter] Response: $statusCode (binary: $isBase64)');
-
-    if (shouldSyncAppCookies) {
-      await _browserSession.syncBoundarySession(
-        source: 'webview_adapter_response',
-        currentUrl: url,
-        controller: _controller,
-      );
-    }
 
     if (isBase64) {
       final bytes = base64Decode(bodyContent);

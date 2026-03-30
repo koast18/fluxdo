@@ -84,13 +84,14 @@ class CanonicalCookie {
     return false;
   }
 
-  /// RFC 6265bis + CHIPS: cookie 唯一标识为 (name, domain, path, hostOnly, partitionKey)
-  /// 同 name/domain/path 但不同 hostOnly 是两条不同的 cookie
+  /// Cookie 唯一标识为 (name, normalizedDomain, path, partitionKey)。
+  /// 故意不含 hostOnly：同域名同名 cookie 只保留一份，新的替换旧的。
+  /// 虽然 RFC 6265bis 将 host-only-flag 纳入 identity，但各平台 WebView API
+  /// 无法可靠还原 hostOnly，保留它会导致同名 cookie 以不同 hostOnly 共存（多副本 bug）。
   String get storageKey => jsonEncode([
     name,
     normalizedDomain,
     path,
-    hostOnly,
     partitionKey,
   ]);
 

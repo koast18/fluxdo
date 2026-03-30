@@ -21,7 +21,7 @@ import '../../constants.dart';
 import '../../providers/message_bus_providers.dart';
 import '../auth_session.dart';
 import '../cf_clearance_refresh_service.dart';
-import '../network/cookie/cookie_sync_service.dart';
+import '../network/cookie/csrf_token_service.dart';
 import '../network/cookie/cookie_jar_service.dart';
 import '../cf_challenge_service.dart';
 import '../message_bus_service.dart';
@@ -29,10 +29,7 @@ import '../network/discourse_dio.dart';
 import '../preloaded_data_service.dart';
 import '../auth_log_service.dart';
 import '../log/log_writer.dart';
-import '../network/browser_session_service.dart';
 import '../network/exceptions/api_exception.dart';
-import '../network/browser_request_fallback_service.dart';
-import '../network/request_sensitivity_policy.dart';
 import '../storage/resilient_secure_storage.dart';
 import '../../l10n/s.dart';
 import '../../utils/url_helper.dart';
@@ -55,7 +52,7 @@ part '_templates.dart';
 abstract class _DiscourseServiceBase {
   Dio get _dio;
   ResilientSecureStorage get _storage;
-  CookieSyncService get _cookieSync;
+  CsrfTokenService get _cookieSync;
   CookieJarService get _cookieJar;
   CfChallengeService get _cfChallenge;
 
@@ -117,7 +114,7 @@ class DiscourseService extends _DiscourseServiceBase
   @override
   final ResilientSecureStorage _storage;
   @override
-  final CookieSyncService _cookieSync = CookieSyncService();
+  final CsrfTokenService _cookieSync = CsrfTokenService();
   @override
   final CookieJarService _cookieJar = CookieJarService();
   @override
@@ -164,7 +161,7 @@ class DiscourseService extends _DiscourseServiceBase
   static final DiscourseService _instance = DiscourseService._internal();
   factory DiscourseService() => _instance;
 
-  CookieSyncService get cookieSync => _cookieSync;
+  CsrfTokenService get cookieSync => _cookieSync;
 
   @override
   bool get isAuthenticated => _tToken != null && _tToken!.isNotEmpty;

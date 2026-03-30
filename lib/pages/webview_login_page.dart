@@ -11,10 +11,10 @@ import '../services/credential_store_service.dart';
 import '../services/auth_session.dart';
 import '../services/discourse/discourse_service.dart';
 import '../services/preloaded_data_service.dart';
-import '../services/network/browser_session_service.dart';
+import '../services/network/cookie/boundary_sync_service.dart';
 import '../services/network/cookie/cookie_jar_service.dart';
-import '../services/network/cookie/cookie_sync_service.dart';
-import '../services/network/cookie/cookie_write_through.dart';
+import '../services/network/cookie/csrf_token_service.dart';
+import '../services/network/cookie/raw_set_cookie_queue.dart';
 import '../services/toast_service.dart';
 import '../services/hcaptcha_accessibility_service.dart';
 import '../services/webview_settings.dart';
@@ -38,7 +38,6 @@ class WebViewLoginPage extends ConsumerStatefulWidget {
 
 class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
   final _service = DiscourseService();
-  final _browserSession = BrowserSessionService.instance;
   final _cookieJar = CookieJarService();
   final _credentialStore = CredentialStoreService();
   final Uri _baseUri = Uri.parse(AppConstants.baseUrl);
@@ -55,7 +54,7 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
   @override
   void initState() {
     super.initState();
-    CookieWriteThrough.instance.seedCriticalCookies();
+    RawSetCookieQueue.instance.flushToWebView();
     HCaptchaAccessibilityService().syncToWebView();
     _loadSavedUsername();
   }
@@ -401,10 +400,7 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
           _isLoading = true;
         });
       }
-      await _browserSession.syncLoginBoundary(
-        controller: controller,
-        currentUrl: currentUrl,
-      );
+      await BoundarySyncService.instance.syncFromWebView(currentUrl: currentUrl);
       final tToken = await _readTTokenFromWebView(
         controller,
         currentUrl: currentUrl,
@@ -451,10 +447,7 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
     // 先切断旧请求，防止登录收口期间旧响应的 Set-Cookie 写入竞争
     AuthSession().advance();
 
-    await _browserSession.syncLoginBoundary(
-      currentUrl: currentUrl,
-      controller: controller,
-    );
+    await BoundarySyncService.instance.syncFromWebView(currentUrl: currentUrl);
 
     final jarToken = await _cookieJar.getTToken();
     final finalToken = (jarToken != null && jarToken.isNotEmpty)
@@ -561,7 +554,7 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
       if (csrf != null &&
           csrf.toString().isNotEmpty &&
           csrf.toString() != 'null') {
-        CookieSyncService().setCsrfToken(csrf.toString());
+        CsrfTokenService().setCsrfToken(csrf.toString());
       }
     } catch (_) {}
   }
@@ -611,11 +604,7 @@ class _WebViewLoginPageState extends ConsumerState<WebViewLoginPage> {
       return jarToken;
     }
 
-    return _cookieJar.readCookieValueFromController(
-      controller,
-      '_t',
-      currentUrl: currentUrl,
-    );
+    return null;
   }
 
   int _recheckCount = 0;

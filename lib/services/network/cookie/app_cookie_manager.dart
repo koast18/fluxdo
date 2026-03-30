@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:cookie_jar/cookie_jar.dart';
@@ -8,8 +7,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../log/log_writer.dart';
 import 'cookie_jar_service.dart';
-import 'session_snapshot_service.dart';
-import 'cookie_write_through.dart';
+import 'raw_set_cookie_queue.dart';
 
 /// App-specific CookieManager.
 /// Avoids saving Set-Cookie into redirect target domains by default.
@@ -393,24 +391,10 @@ class AppCookieManager extends Interceptor {
       );
     }
 
-    SessionSnapshotService.instance.mergeFromCookies(
-      filteredCookies,
-      source: 'response_set_cookie',
-    );
-
-    // 实时推送关键 cookie 到 WebView（不阻塞 Dio 响应链）
-    // 同时传递原始 Set-Cookie 头，优先用 raw 写入保留 host-only 等语义
-    final rawHeaders = <String, String>{};
-    for (var i = 0; i < filteredCookies.length; i++) {
-      if (i < filteredSetCookieHeaders.length) {
-        rawHeaders[filteredCookies[i].name] = filteredSetCookieHeaders[i];
-      }
+    // 将原始 Set-Cookie 头逐条入队，供后续处理使用
+    for (final rawHeader in filteredSetCookieHeaders) {
+      RawSetCookieQueue.instance.enqueue(resolvedUri.toString(), rawHeader);
     }
-    unawaited(CookieWriteThrough.instance.writeThrough(
-      filteredCookies,
-      originalUri,
-      rawSetCookieHeaders: rawHeaders,
-    ));
 
     // Optionally save cookies for redirected locations.
     final allowRedirectSave = response.requestOptions.extra['allowRedirectSetCookie'] == true;

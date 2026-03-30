@@ -6,8 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../utils/link_launcher.dart';
 import '../services/toast_service.dart';
 import '../services/app_link_service.dart';
-import '../services/network/cookie/cookie_jar_service.dart';
-import '../services/network/cookie/cookie_write_through.dart';
+import '../services/network/cookie/raw_set_cookie_queue.dart';
 import '../services/webview_settings.dart';
 import '../services/windows_webview_environment_service.dart';
 import '../widgets/common/app_link_confirm_dialog.dart';
@@ -244,11 +243,8 @@ class _WebViewPageState extends ConsumerState<WebViewPage> {
                     onWebViewCreated: (controller) async {
                       _controller = controller;
                       if (io.Platform.isWindows && widget.url.isNotEmpty) {
-                        // Windows：只走 CDP 路径，不需要再 syncToWebView 双写
-                        await CookieJarService().syncToWebViewViaController(
-                          controller,
-                          currentUrl: widget.url,
-                        );
+                        // Windows：在 onWebViewCreated 中 flush cookie 后再加载 URL
+                        await RawSetCookieQueue.instance.flushToWebView();
                         await controller.loadUrl(
                           urlRequest: URLRequest(url: WebUri(widget.url)),
                         );
@@ -378,8 +374,7 @@ class _WebViewPageState extends ConsumerState<WebViewPage> {
 
   Future<void> _seedAndBarrier() async {
     if (io.Platform.isWindows) return; // Windows 在 onWebViewCreated 中处理
-    await CookieWriteThrough.instance.barrier();
-    await CookieJarService().syncToWebView(currentUrl: widget.url);
+    await RawSetCookieQueue.instance.flushToWebView();
   }
 
   void _handleMenuAction(String action) {

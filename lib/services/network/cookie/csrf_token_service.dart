@@ -11,10 +11,10 @@ import '../../storage/resilient_secure_storage.dart';
 
 /// Cookie 同步服务
 /// 管理 CSRF token，支持自动刷新（对齐 Discourse 官方前端策略）
-class CookieSyncService {
-  static final CookieSyncService _instance = CookieSyncService._internal();
-  factory CookieSyncService() => _instance;
-  CookieSyncService._internal();
+class CsrfTokenService {
+  static final CsrfTokenService _instance = CsrfTokenService._internal();
+  factory CsrfTokenService() => _instance;
+  CsrfTokenService._internal();
 
   static const String _csrfTokenKey = 'linux_do_csrf_token';
 
@@ -100,8 +100,8 @@ class CookieSyncService {
       final csrf = (response.data as Map<String, dynamic>?)?['csrf'] as String?;
       if (csrf != null && csrf.isNotEmpty) {
         setCsrfToken(csrf);
-        debugPrint('[CookieSyncService] CSRF token 已刷新');
-        AppLogger.info('CSRF token 已刷新', tag: 'CookieSyncService');
+        debugPrint('[CsrfTokenService] CSRF token 已刷新');
+        AppLogger.info('CSRF token 已刷新', tag: 'CsrfTokenService');
       }
     } on DioException catch (e) {
       final statusCode = e.response?.statusCode;
@@ -116,13 +116,13 @@ class CookieSyncService {
       final message =
           'CSRF token 刷新失败: status=$statusCode, url=$uri, '
           'type=${e.type}, response=$responsePreview';
-      debugPrint('[CookieSyncService] $message');
-      AppLogger.warning(message, tag: 'CookieSyncService');
+      debugPrint('[CsrfTokenService] $message');
+      AppLogger.warning(message, tag: 'CsrfTokenService');
     } catch (e, stackTrace) {
-      debugPrint('[CookieSyncService] CSRF token 刷新失败: $e');
+      debugPrint('[CsrfTokenService] CSRF token 刷新失败: $e');
       AppLogger.error(
         'CSRF token 刷新异常',
-        tag: 'CookieSyncService',
+        tag: 'CsrfTokenService',
         error: e,
         stackTrace: stackTrace,
       );

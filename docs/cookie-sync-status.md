@@ -1,372 +1,204 @@
-# Cookie / 会话架构现状
+# Cookie 架构
 
-## 结论
+## 版本历史
 
-当前实现已经不再是“WebView 和 `CookieJar` 常态双向同步”。
+| 版本 | 模型 | 问题 |
+|------|------|------|
+| v0.1.x | WebView ↔ CookieJar 双向常态同步 | 多套状态互相污染；cookie 属性在跨平台同步中丢失 |
+| v0.2.0 | 浏览器优先 + SessionSnapshot | 去掉常态同步，但保留了复杂的 strategy/coordinator 层 |
+| v0.2.3 | 边界同步 + BrowserSessionService | 进一步收敛同步入口，但 hostOnly 推断错误导致多副本 bug |
+| **v0.3.0** | **CookieJar 唯一存储 + 原始头队列** | **本次重构。删除 strategy/coordinator/snapshot，storageKey 放宽** |
 
-现在的主策略是：
+## 当前架构（v0.3.0）
 
-1. **浏览器环境是认证真相源**
-2. **`SessionSnapshot` 是 App 热路径会话副本**
-3. **`CookieJar` 退为兼容层 / 持久化辅助层**
-4. **敏感请求允许回落到浏览器环境**
-5. **只在边界时机做显式会话同步**
+### 核心规则
 
-这套方案不是“理论完美统一存储”，但在当前约束下更稳，也更符合 Cloudflare/登录态的实际行为。
+**一个 Cookie 在一个域名下不可能出现两次。** `(name, normalizedDomain, path)` 是唯一 identity，新的替换旧的。
 
----
+### 角色分工
 
-## 为什么这么改
+| 组件 | 职责 |
+|------|------|
+| `CookieJar` (`EnhancedPersistCookieJar`) | cookie 唯一存储，持久化到磁盘 |
+| `BoundarySyncService` | 边界同步：登录/CF 成功时从 WebView 读 cookie 写入 jar |
+| `RawSetCookieQueue` | Dio 原始 Set-Cookie 头持久化队列，打开 WebView 时刷入 |
+| `AppCookieManager` | Dio 拦截器：请求加载 cookie、响应保存 Set-Cookie |
+| `CsrfTokenService` | CSRF token 管理（原 CookieSyncService） |
 
-旧模型的问题是：
-
-- WebView 浏览过程中会不断把状态反向写回 App
-- App 又会把自己的状态再写回 WebView
-- 多套状态持续相互污染
-- Cloudflare challenge 在浏览器环境通过，但后续请求却不一定仍在同一环境执行
-
-所以当前改造目标不是“继续把同步做得更频繁”，而是：
-
-- **减少同步**
-- **收窄状态范围**
-- **保留浏览器环境完整性**
-
----
-
-## 当前角色分工
-
-### 1. 浏览器环境
-
-包括：
-
-- `InAppWebView`
-- `HeadlessInAppWebView`
-- 平台 WebView cookie/store/storage
-
-职责：
-
-- 登录
-- 登出
-- Cloudflare challenge
-- 站内 WebView 页面
-- 浏览器态敏感请求
-
-### 2. `SessionSnapshot`
-
-位置：
-
-- [session_snapshot_service.dart](../lib/services/network/cookie/session_snapshot_service.dart)
-
-职责：
-
-- 给 App 原生请求热路径提供会话副本
-- 只保存关键 cookie
-- 避免每次请求都去读取浏览器 cookie store
-
-当前仅保存：
-
-- `_t`
-- `_forum_session`
-- `cf_clearance`
-
-### 3. `CookieJar`
-
-位置：
-
-- [cookie_jar_service.dart](../lib/services/network/cookie/cookie_jar_service.dart)
-- [app_cookie_manager.dart](../lib/services/network/cookie/app_cookie_manager.dart)
-
-职责：
-
-- 兼容现有 Dio `Set-Cookie` 写入链
-- 作为过渡期持久化层
-- 为 `SessionSnapshot` 提供初始化来源
-
-它**不再应该被理解成浏览器认证真相源**。
-
-### 4. `BrowserSessionService`
-
-位置：
-
-- [browser_session_service.dart](../lib/services/network/browser_session_service.dart)
-
-职责：
-
-- 统一边界同步入口
-- 统一登录 / CF / 浏览器回落后的快照刷新
-- 避免登录页、CF 服务、拦截器、适配器各自直接操作 `CookieJarService`
-
----
-
-## 当前请求策略
-
-### 普通请求
-
-- 默认走 Dio / Cronet / Rhttp
-- 使用 `SessionSnapshot`
-
-### 敏感请求
-
-满足以下条件之一的请求会在 `401/403` 时尝试回落到浏览器环境：
-
-- `/topics/timings`
-- `/posts`
-- `/post_actions`
-- `/notifications`
-- `/presence`
-- `/uploads`
-- `/u/.../preferences`
-
-相关文件：
-
-- [request_sensitivity_policy.dart](/D:/teng/Documents/i/ldx/lib/services/network/request_sensitivity_policy.dart)
-- [browser_request_fallback_service.dart](/D:/teng/Documents/i/ldx/lib/services/network/browser_request_fallback_service.dart)
-- [_auth.dart](/D:/teng/Documents/i/ldx/lib/services/discourse/_auth.dart)
-
-### 浏览器专属请求
-
-以下场景直接留在浏览器环境：
-
-- 登录
-- Cloudflare challenge
-- WebView 页面内部请求
-
----
-
-## 流程图
-
-### 整体状态流
+### 数据流
 
 ```mermaid
 flowchart TD
-    Browser["浏览器环境\nWebView / HeadlessWebView"] -->|边界同步| Snapshot["SessionSnapshot\n关键会话副本"]
-    Server["服务端 Set-Cookie"] --> CookieJar["CookieJar\n兼容层/持久化辅助层"]
-    CookieJar --> Snapshot
-    Snapshot --> Dio["Dio / Cronet / Rhttp\n普通请求热路径"]
-    Snapshot -->|单向注入| Browser
-    Dio -.敏感请求 401/403.-> BrowserFallback["浏览器环境回落"]
-    BrowserFallback --> Snapshot
+    Login["登录/CF 成功"] -->|BoundarySyncService| Jar["CookieJar\n唯一存储"]
+    DioResp["Dio Set-Cookie 响应"] -->|AppCookieManager| Jar
+    DioResp -->|原始头入队| Queue["RawSetCookieQueue\n持久化到磁盘"]
+    Jar --> DioReq["Dio 请求\nloadForRequest()"]
+    Queue -->|打开 WebView 前 flush| WebView["WebView\n浏览器 cookie store"]
+    Jar -->|rawSetCookie 兜底| WebView
+    ColdStart["冷启动"] --> Jar
+    ColdStart --> Queue
 ```
 
-### 登录收口
+### 边界同步时序
 
 ```mermaid
 sequenceDiagram
     participant U as 用户
     participant W as WebView
-    participant B as Browser Cookie Store
+    participant B as BoundarySyncService
     participant J as CookieJar
-    participant S as SessionSnapshot
-    participant A as App
+    participant D as Dio
 
     U->>W: 登录
-    W->>B: 站点写入关键 cookie
-    W->>J: syncCriticalCookiesFromController()
-    J->>S: refreshSessionSnapshot()
-    S->>A: App 热路径会话更新
+    W->>W: 服务端写入 cookie
+    W->>B: 登录成功回调
+    B->>W: getCookies(url)
+    W-->>B: cookie 属性（含 domain）
+    B->>J: saveFromResponse()
+    Note over J: storageKey 去重，新覆盖旧
+    D->>J: loadForRequest()
+    J-->>D: cookie 用于请求
 ```
 
-### 普通请求
+### 打开 WebView 时序
 
 ```mermaid
 sequenceDiagram
-    participant A as App 请求层
-    participant S as SessionSnapshot
-    participant D as Dio
-    participant API as 服务端
+    participant App as App
+    participant Q as RawSetCookieQueue
+    participant W as RawCookieWriter
+    participant WV as WebView
 
-    A->>S: 读取关键会话
-    S->>D: 提供 cookie/header
-    D->>API: 发起请求
-    API-->>D: 响应 / Set-Cookie
-    D->>S: merge 关键 cookie
-```
-
-### 敏感请求回落
-
-```mermaid
-sequenceDiagram
-    participant D as Dio
-    participant API as 服务端
-    participant P as SensitivePolicy
-    participant W as Browser Fallback
-    participant S as SessionSnapshot
-
-    D->>API: 普通发起
-    API-->>D: 401 / 403
-    D->>P: 判断是否敏感请求
-    P-->>D: 是
-    D->>W: 用浏览器环境重试
-    W->>API: 同浏览器环境请求
-    API-->>W: 成功
-    W->>S: refreshSessionSnapshot()
+    App->>Q: flushToWebView()
+    Q->>Q: 从磁盘加载队列
+    alt 队列非空
+        Q->>W: setRawCookie(url, rawHeader)
+        W->>WV: 原始 Set-Cookie 头写入
+        Q->>Q: 清空已写入条目
+    else 队列空（冷启动）
+        Q->>Q: 从 jar 读 rawSetCookie 兜底
+        Q->>W: setRawCookie()
+    end
 ```
 
 ---
 
-## 这次改造后已经发生的变化
+## 平台 cookie 属性获取能力
 
-### 已移除
+WebView `CookieManager.getCookies()` 在各平台返回的字段：
 
-- `WebViewPage` 普通浏览过程中的常态 `syncFromWebView`
-- 将浏览器普通浏览状态持续回灌到 App 的行为
+| 平台 | API | domain | httpOnly | secure | path | expires | sameSite |
+|------|-----|--------|----------|--------|------|---------|---------|
+| **Android (新 WebView)** | `CookieManagerCompat.getCookieInfo()` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Android (旧 WebView)** | `CookieManager.getCookie()` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **iOS / macOS** | `WKHTTPCookieStore.getAllCookies()` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Windows** | CDP `Network.getCookies` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Linux** | WPE `getAllCookies()` | 待验证 | 待验证 | 待验证 | 待验证 | 待验证 | 待验证 |
 
-### 已新增
+### Android 详细说明
 
-- `SessionSnapshotService`
-- `syncSessionSnapshotFromWebView(...)`
-- 敏感请求浏览器环境回落
+Android 的 `flutter_inappwebview` (`MyCookieManager.java`) 有两条路径：
 
-### 已保留但角色变化
+```java
+if (WebViewFeature.isFeatureSupported(WebViewFeature.GET_COOKIE_INFO)) {
+    // 新路径：返回完整 Set-Cookie 格式字符串
+    // Domain=, HttpOnly, Secure, Path, SameSite, Expires 全部包含
+    cookies = CookieManagerCompat.getCookieInfo(cookieManager, url);
+} else {
+    // 旧路径：只返回 "name1=value1; name2=value2"
+    cookiesString = cookieManager.getCookie(url);
+}
+```
 
-- `CookieJar` 仍存在，但主职责已弱化
-- Android CDP 仍保留，但不再适合作为主流程依赖
+- `GET_COOKIE_INFO` 在 `androidx.webkit 1.6.0`（2023 年 1 月）引入
+- 对应 Chrome WebView ~114+（2023 年 5 月）
+- 运行时通过 `WebViewFeature.isFeatureSupported()` 检测
+- 2026 年绝大多数设备已支持（WebView 通过 Play Store 自动更新）
 
----
+### 旧 Android 兜底策略
 
-## Android CDP 现状
+当 `GET_COOKIE_INFO` 不支持（domain 为 null）时：
 
-位置：
-
-- [android_cdp_feature.dart](/D:/teng/Documents/i/ldx/lib/services/network/cookie/android_cdp_feature.dart)
-- [android_cdp_service.dart](/D:/teng/Documents/i/ldx/lib/services/network/cookie/android_cdp_service.dart)
-
-当前定位：
-
-- 诊断
-- 高可信观测
-- 少量兜底
-
-不再建议：
-
-- 作为热路径依赖
-- 在 Cloudflare challenge 关键路径上频繁轮询 `awaitTargetReady`
-
-当前默认策略：
-
-- **Android CDP 默认关闭**
-- 老用户升级后通过迁移强制切到关闭
-- 用户仍可手动开启
+1. **优先继承 jar 中已有的 domain**（来自之前的 Dio Set-Cookie 响应）
+2. **jar 也没有 → 兜底为 `.{host}`**（domain cookie，覆盖子域名）
+3. 后续 Dio 响应的 Set-Cookie 会用正确属性覆盖
 
 ---
 
-## 显式边界同步时机
+## storageKey 设计说明
 
-仅在以下时机回收浏览器会话：
+### 当前 storageKey
 
-- 登录成功
-- Cloudflare challenge 成功
-- 浏览器环境回落成功
-- WebView 请求链路完成后需要收口时
-- 清理/恢复会话时
+```dart
+storageKey = jsonEncode([name, normalizedDomain, path, partitionKey])
+```
 
-不再在以下场景同步：
+### 与 RFC 6265bis 的差异
 
-- 普通 WebView 浏览 `loadStop`
-- 普通历史跳转
-- 浏览器内部无关 cookie 波动
+RFC 6265bis (Section 5.7, Step 23) 定义 cookie identity 包含 `host-only-flag`：
 
----
+> If the cookie store contains a cookie with the same name, domain, host-only-flag, and path...
 
-## 迁移状态
+本项目故意去掉 `hostOnly`，原因：
 
-### `cookie_clean_slate_v2`
+1. **各平台 WebView API 无法可靠还原 hostOnly**（Android 旧设备完全没有，新设备也依赖运行时 feature check）
+2. **保留 hostOnly 会导致同名 cookie 以不同 hostOnly 共存**——这正是 v0.2.x 多副本 bug 的根因
+3. **实际场景中同域名同名 cookie 不应有两份**——服务端不会同时发 host-only 和 domain 两个版本的同名 cookie
 
-- 历史 `EnhancedPersistCookieJar` 切换迁移
-- 清理旧 cookie 存储
-
-### `cookie_clean_slate_v3`
-
-- 浏览器优先双通道切换迁移
-- 对存量用户执行一次**全量 Cookie 清理**
-- 清理范围：
-  - `CookieJar`
-  - WebView cookie store
-  - `SessionSnapshot`
-- 执行后要求重新登录
-
-### `android_native_cdp_default_off_v1`
-
-- Android 老用户升级后，强制将 `pref_android_native_cdp` 设为 `false`
-- 新用户默认也是关闭
-
-迁移文件：
-
-- [migration_service.dart](/D:/teng/Documents/i/ldx/lib/services/migration_service.dart)
-
----
-
-## 现在还不够优雅的地方
-
-虽然已经比旧模型健康，但当前仍有一些交叉职责：
-
-1. **会话读取入口仍不完全单一**
-   仍存在 `CookieJar`、快照、浏览器直接读取等多种入口
-
-2. **会话写入入口仍偏多**
-   服务端响应、登录收口、CF 收口、恢复逻辑都可能触发更新
-
-3. **边界同步点分散**
-   已开始收敛到 `BrowserSessionService`，但还不是所有会话入口都完全统一
-
-4. **`CookieJar` 仍是历史兼容主角**
-   还没有完全降级为纯兼容层
-
----
-
-## 什么叫“更优雅”
-
-如果后续继续收口，目标应该是：
-
-1. App 热路径**只读 `SessionSnapshot`**
-2. 浏览器环境作为唯一认证真相源
-3. `CookieJar` 只保留兼容与持久化辅助职责
-4. 浏览器 -> App 会话回收统一走一个 orchestrator
-
-也就是说，后续“更优雅”的方向不是再加更多同步逻辑，而是：
-
-- **减少入口**
-- **减少职责重叠**
-- **固定主从关系**
+去掉 hostOnly 后，`hostOnly` 仍作为 `CanonicalCookie` 的字段保留（影响 `loadForRequest` 的匹配行为），只是不再参与去重。
 
 ---
 
 ## 关键文件
 
-### 会话快照
+### Cookie 存储
 
-- [session_snapshot_service.dart](../lib/services/network/cookie/session_snapshot_service.dart)
+- [cookie_jar_service.dart](../lib/services/network/cookie/cookie_jar_service.dart) — 统一 cookie 管理服务
+- [app_cookie_manager.dart](../lib/services/network/cookie/app_cookie_manager.dart) — Dio 拦截器
 
-### Cookie 管理
+### 同步
 
-- [cookie_jar_service.dart](../lib/services/network/cookie/cookie_jar_service.dart)
-- [app_cookie_manager.dart](../lib/services/network/cookie/app_cookie_manager.dart)
-- [cookie_write_through.dart](../lib/services/network/cookie/cookie_write_through.dart)
+- [boundary_sync_service.dart](../lib/services/network/cookie/boundary_sync_service.dart) — WebView → jar 边界同步
+- [raw_set_cookie_queue.dart](../lib/services/network/cookie/raw_set_cookie_queue.dart) — jar → WebView 原始头队列
 
-### 浏览器回落
+### 基础设施
 
-- [browser_session_service.dart](../lib/services/network/browser_session_service.dart)
-- [request_sensitivity_policy.dart](../lib/services/network/request_sensitivity_policy.dart)
-- [browser_request_fallback_service.dart](../lib/services/network/browser_request_fallback_service.dart)
-- [webview_http_adapter.dart](../lib/services/network/adapters/webview_http_adapter.dart)
+- [cookie_logger.dart](../lib/services/network/cookie/cookie_logger.dart) — 统一日志
+- [csrf_token_service.dart](../lib/services/network/cookie/csrf_token_service.dart) — CSRF token 管理
+- [cookie_value_codec.dart](../lib/services/network/cookie/cookie_value_codec.dart) — RFC 6265 值编码
+- [raw_cookie_writer.dart](../lib/services/network/cookie/raw_cookie_writer.dart) — 原生平台 Set-Cookie 写入
 
-### 登录 / CF 收口
+### Android CDP（可选）
 
-- [webview_login_page.dart](../lib/pages/webview_login_page.dart)
-- [cf_challenge_service.dart](../lib/services/cf_challenge_service.dart)
-- [cf_challenge_interceptor.dart](../lib/services/network/interceptors/cf_challenge_interceptor.dart)
+- [android_cdp_feature.dart](../lib/services/network/cookie/android_cdp_feature.dart) — 功能开关（默认关闭）
+- [android_cdp_service.dart](../lib/services/network/cookie/android_cdp_service.dart) — 原生 CDP 通道
+
+### enhanced_cookie_jar 包
+
+- [canonical_cookie.dart](../packages/enhanced_cookie_jar/lib/src/canonical_cookie.dart) — Cookie 模型
+- [enhanced_persist_cookie_jar.dart](../packages/enhanced_cookie_jar/lib/src/enhanced_persist_cookie_jar.dart) — 持久化 jar
+- [set_cookie_parser.dart](../packages/enhanced_cookie_jar/lib/src/set_cookie_parser.dart) — Set-Cookie 解析
+- [file_cookie_store.dart](../packages/enhanced_cookie_jar/lib/src/file_cookie_store.dart) — 文件存储
+
+### 消费方
+
+- [webview_login_page.dart](../lib/pages/webview_login_page.dart) — 登录收口
+- [webview_page.dart](../lib/pages/webview_page.dart) — WebView 页面
+- [cf_challenge_service.dart](../lib/services/cf_challenge_service.dart) — CF 验证
+- [cf_challenge_interceptor.dart](../lib/services/network/interceptors/cf_challenge_interceptor.dart) — CF 拦截器
+- [webview_http_adapter.dart](../lib/services/network/adapters/webview_http_adapter.dart) — WebView HTTP 适配器
 
 ### 迁移
 
-- [migration_service.dart](../lib/services/migration_service.dart)
+- [migration_service.dart](../lib/services/migration_service.dart) — 含 `cookie_relaxed_key_v4`
 
 ---
 
-## 当前建议
+## 迁移历史
 
-短期内继续坚持这 4 条：
-
-1. 不再恢复常态双向同步
-2. 不再新增新的会话读入口
-3. 不再新增新的浏览器 -> App 同步入口
-4. 敏感请求优先浏览器环境兜底，而不是继续强化 cookie 同步
+| key | 版本 | 作用 |
+|-----|------|------|
+| `cookie_clean_slate_v2` | v0.2.0 | `EnhancedPersistCookieJar` 切换迁移 |
+| `cookie_clean_slate_v3` | v0.2.3 | 浏览器优先双通道切换迁移 |
+| `android_native_cdp_default_off_v1` | v0.2.3 | Android CDP 默认关闭 |
+| `cookie_relaxed_key_v4` | v0.3.0 | storageKey 放宽，清理旧 cookie |

@@ -3,7 +3,7 @@ import 'dart:io' as io;
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../constants.dart';
-import 'network/browser_session_service.dart';
+import 'network/cookie/boundary_sync_service.dart';
 import 'network/cookie/cookie_jar_service.dart';
 import 'local_notification_service.dart'; // 用于获取全局 navigatorKey
 import 'cf_challenge_logger.dart';
@@ -209,7 +209,6 @@ class CfChallengeService {
     // Dio 请求已经 403，说明当前 cf_clearance 可能失效了。
     // 必须确保 WebView 中也没有旧的 cf_clearance，否则 CF 直接放行不显示盾。
     await cookieJarService.deleteCookie('cf_clearance');
-    await cookieJarService.deleteWebViewCookie('cf_clearance');
     if (!overlayState.mounted) {
       debugPrint('[CfChallenge] Overlay no longer mounted');
       CfChallengeLogger.log('[VERIFY] Overlay not mounted');
@@ -366,7 +365,6 @@ class CfChallengePage extends StatefulWidget {
 }
 
 class _CfChallengePageState extends State<CfChallengePage> {
-  final BrowserSessionService _browserSession = BrowserSessionService.instance;
   InAppWebViewController? _controller;
   bool _isLoading = true;
   double _progress = 0;
@@ -453,13 +451,9 @@ class _CfChallengePageState extends State<CfChallengePage> {
       debugPrint('[CfChallenge] CookieManager 读取 $name 失败: $e');
     }
 
-    // Windows 上通过 CookieJarService 的统一方法读取
-    if (io.Platform.isWindows && _controller != null) {
-      return CookieJarService().readCookieValueFromController(
-        _controller!,
-        name,
-        currentUrl: widget.verifyUrl,
-      );
+    // Windows/Linux：从 CookieJar 读取
+    if (io.Platform.isWindows) {
+      return CookieJarService().getCookieValue(name);
     }
 
     // Linux WPE: getCookie() 内部已调 getCookies(url) 做 URL 过滤，
@@ -480,13 +474,9 @@ class _CfChallengePageState extends State<CfChallengePage> {
     return null;
   }
 
-  /// 将关键 cookie 从 WebView DevTools 同步到 CookieJar
+  /// 将关键 cookie 从 WebView 同步到 CookieJar
   Future<void> _syncLiveCookiesToCookieJar() async {
-    final controller = _controller;
-    if (controller == null) return;
-
-    await CookieJarService().syncCriticalCookiesFromController(
-      controller,
+    await BoundarySyncService.instance.syncFromWebView(
       currentUrl: widget.verifyUrl,
       cookieNames: const {'cf_clearance'},
     );
@@ -592,9 +582,9 @@ class _CfChallengePageState extends State<CfChallengePage> {
         reason: 'new cf_clearance detected and page passed challenge',
       );
       await _syncLiveCookiesToCookieJar();
-      await _browserSession.syncCfBoundary(
-        controller: _controller,
+      await BoundarySyncService.instance.syncFromWebView(
         currentUrl: widget.verifyUrl,
+        cookieNames: {'cf_clearance'},
       );
       // 验证 cf_clearance 是否真正写入了 CookieJar
       final synced = await CookieJarService().getCfClearance();
@@ -691,9 +681,9 @@ class _CfChallengePageState extends State<CfChallengePage> {
             reason: 'no challenge but new cf_clearance detected',
           );
           await _syncLiveCookiesToCookieJar();
-          await _browserSession.syncCfBoundary(
-            controller: _controller,
+          await BoundarySyncService.instance.syncFromWebView(
             currentUrl: widget.verifyUrl,
+            cookieNames: {'cf_clearance'},
           );
           _timeoutTimer?.cancel();
           if (mounted) _finish(true);
@@ -739,9 +729,9 @@ class _CfChallengePageState extends State<CfChallengePage> {
         reason: 'polling detected new cf_clearance',
       );
       await _syncLiveCookiesToCookieJar();
-      await _browserSession.syncCfBoundary(
-        controller: _controller,
+      await BoundarySyncService.instance.syncFromWebView(
         currentUrl: widget.verifyUrl,
+        cookieNames: {'cf_clearance'},
       );
       _timeoutTimer?.cancel();
       if (mounted) _finish(true);

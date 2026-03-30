@@ -35,7 +35,8 @@ class _PreheatGateState extends State<PreheatGate> {
   void initState() {
     super.initState();
     _readIconStyle();
-    _loadFuture = _preload();
+    // 延迟到下一帧执行，确保 context 可用（_preload 内部可能弹 Dialog）
+    _loadFuture = Future.microtask(() => _preload());
   }
 
   void _readIconStyle() {
