@@ -1,4 +1,5 @@
 import Flutter
+import SafariServices
 import UIKit
 import WebKit
 import workmanager_apple
@@ -320,8 +321,8 @@ import workmanager_apple
     }
   }
 
-  /// 启动临时 HTTP server 提供 mobileconfig 下载，然后用 Safari 打开
-  /// 全部在原生层处理，通过 beginBackgroundTask 保活
+  /// 启动临时 HTTP server 提供 mobileconfig 下载，使用 SFSafariViewController 在应用内打开
+  /// 应用保持前台运行，避免后台被系统回收导致下载失败
   private func serveMobileconfigViaSafari(_ mobileconfig: String, completion: @escaping (Bool) -> Void) {
     DispatchQueue.global(qos: .userInitiated).async {
       // 创建 TCP socket
@@ -334,9 +335,13 @@ import workmanager_apple
       var reuse: Int32 = 1
       setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &reuse, socklen_t(MemoryLayout<Int32>.size))
 
+      // 设置 accept 超时 30 秒，防止永久阻塞
+      var timeout = timeval(tv_sec: 30, tv_usec: 0)
+      setsockopt(serverSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+
       var addr = sockaddr_in()
       addr.sin_family = sa_family_t(AF_INET)
-      addr.sin_port = 0 // 自动分配端口
+      addr.sin_port = 0
       addr.sin_addr.s_addr = inet_addr("127.0.0.1")
       addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
 
@@ -351,9 +356,8 @@ import workmanager_apple
         return
       }
 
-      listen(serverSocket, 1)
+      listen(serverSocket, 5)
 
-      // 获取实际端口
       var boundAddr = sockaddr_in()
       var addrLen = socklen_t(MemoryLayout<sockaddr_in>.size)
       withUnsafeMutablePointer(to: &boundAddr) {
@@ -363,50 +367,66 @@ import workmanager_apple
       }
       let port = Int(CFSwapInt16BigToHost(boundAddr.sin_port))
 
-      // 请求后台执行时间
-      var bgTask: UIBackgroundTaskIdentifier = .invalid
-      DispatchQueue.main.async {
-        bgTask = UIApplication.shared.beginBackgroundTask {
-          UIApplication.shared.endBackgroundTask(bgTask)
-          bgTask = .invalid
-        }
-      }
-
-      // 用 Safari 打开 URL
+      // 使用 SFSafariViewController 在应用内打开，保持前台运行
       let url = URL(string: "http://127.0.0.1:\(port)/ca.mobileconfig")!
       DispatchQueue.main.async {
-        UIApplication.shared.open(url, options: [:]) { _ in }
+        guard let rootVC = self.window?.rootViewController else {
+          completion(false)
+          return
+        }
+        let safariVC = SFSafariViewController(url: url)
+        safariVC.modalPresentationStyle = .pageSheet
+        rootVC.present(safariVC, animated: true)
         completion(true)
       }
 
-      // 等待一个连接（阻塞，在后台线程）
-      let clientSocket = accept(serverSocket, nil, nil)
-      if clientSocket >= 0 {
-        // 读取请求（不解析，直接丢弃）
-        var buffer = [UInt8](repeating: 0, count: 4096)
-        _ = recv(clientSocket, &buffer, buffer.count, 0)
+      // 循环处理连接：Safari 可能发送 favicon 等额外请求
+      let body = Data(mobileconfig.utf8)
+      var served = false
+      for _ in 0..<10 {
+        let clientSocket = accept(serverSocket, nil, nil)
+        guard clientSocket >= 0 else { break } // 超时或错误
 
-        // 发送 HTTP 响应
-        let body = Data(mobileconfig.utf8)
-        let header = "HTTP/1.1 200 OK\r\n" +
-          "Content-Type: application/x-apple-aspen-config\r\n" +
-          "Content-Disposition: attachment; filename=\"DOH_Proxy_CA.mobileconfig\"\r\n" +
-          "Content-Length: \(body.count)\r\n" +
-          "Connection: close\r\n\r\n"
-        _ = send(clientSocket, header, header.utf8.count, 0)
-        body.withUnsafeBytes { ptr in
-          _ = send(clientSocket, ptr.baseAddress, body.count, 0)
+        // 读取请求
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        let bytesRead = recv(clientSocket, &buffer, buffer.count, 0)
+
+        // 解析请求路径
+        var isMobileconfig = false
+        if bytesRead > 0,
+           let request = String(bytes: buffer[..<bytesRead], encoding: .utf8),
+           let firstLine = request.split(separator: "\r\n").first {
+          isMobileconfig = firstLine.contains("/ca.mobileconfig")
         }
-        close(clientSocket)
+
+        if isMobileconfig {
+          // 返回描述文件
+          let header = "HTTP/1.1 200 OK\r\n" +
+            "Content-Type: application/x-apple-aspen-config\r\n" +
+            "Content-Disposition: attachment; filename=\"DOH_Proxy_CA.mobileconfig\"\r\n" +
+            "Content-Length: \(body.count)\r\n" +
+            "Connection: close\r\n\r\n"
+          _ = send(clientSocket, header, header.utf8.count, 0)
+          body.withUnsafeBytes { ptr in
+            _ = send(clientSocket, ptr.baseAddress, body.count, 0)
+          }
+          close(clientSocket)
+          served = true
+          break
+        } else {
+          // 非目标请求，返回 404
+          let notFound = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+          _ = send(clientSocket, notFound, notFound.utf8.count, 0)
+          close(clientSocket)
+        }
       }
 
       close(serverSocket)
 
-      // 结束后台任务
-      DispatchQueue.main.async {
-        if bgTask != .invalid {
-          UIApplication.shared.endBackgroundTask(bgTask)
-          bgTask = .invalid
+      // 如果超时未提供文件，关闭 SFSafariViewController
+      if !served {
+        DispatchQueue.main.async {
+          self.window?.rootViewController?.presentedViewController?.dismiss(animated: true)
         }
       }
     }
