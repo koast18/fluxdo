@@ -25,16 +25,25 @@ class CronetFallbackService extends ChangeNotifier {
     _prefs = prefs;
     _isInitialized = true;
 
-    // 加载持久化状态
-    _hasFallenBack = prefs.getBool(_hasFallenBackKey) ?? false;
-    _fallbackReason = prefs.getString(_fallbackReasonKey);
+    // 加载手动强制降级状态（用户主动选择，需要保留）
     _forceFallback = prefs.getBool(_forceFallbackKey) ?? false;
 
-    if (_hasFallenBack) {
-      debugPrint('[Cronet] Loaded fallback state: $_fallbackReason');
+    // 冷启动时自动清除上次的自动降级状态，让 Cronet 每次启动都有新机会。
+    // 如果 Cronet 确实有问题，本次会话内会再次触发降级并快速切换。
+    final previouslyFallenBack = prefs.getBool(_hasFallenBackKey) ?? false;
+    if (previouslyFallenBack) {
+      debugPrint(
+        '[Cronet] Clearing previous auto-fallback on cold start '
+        '(reason: ${prefs.getString(_fallbackReasonKey)})',
+      );
+      await prefs.remove(_hasFallenBackKey);
+      await prefs.remove(_fallbackReasonKey);
     }
+    _hasFallenBack = false;
+    _fallbackReason = null;
+
     if (_forceFallback) {
-      debugPrint('[Cronet] Force fallback is enabled');
+      debugPrint('[Cronet] Force fallback is enabled (user preference)');
     }
   }
 
@@ -115,6 +124,14 @@ This is a simulated error for testing the fallback mechanism.
     final errorStr = error.toString();
     final errorStrLower = errorStr.toLowerCase();
 
+    // 0. 排除生命周期时序错误（瞬态错误，不代表 Cronet 本身有问题）
+    // 例如切换 adapter 时 close 旧 delegate，若有请求在飞则抛
+    // "Cannot shutdown with running requests"
+    if (_isTransientLifecycleError(errorStrLower)) {
+      debugPrint('[Cronet] Ignoring transient lifecycle error');
+      return false;
+    }
+
     // 1. 检查堆栈信息中是否包含 Cronet 相关的类
     // 这是最可靠的判断方式
     final cronetStackTracePatterns = [
@@ -157,6 +174,20 @@ This is a simulated error for testing the fallback mechanism.
       return true;
     }
 
+    return false;
+  }
+
+  /// 判断是否为瞬态生命周期错误
+  /// 这类错误是 CronetEngine 关闭时序问题，不代表 Cronet 功能异常
+  static bool _isTransientLifecycleError(String errorStrLower) {
+    const transientPatterns = [
+      'cannot shutdown with running requests', // close() 时还有请求在飞
+      'engine is shut down', // 引擎已关闭后的请求
+      'request already started', // 重复启动请求
+    ];
+    for (final pattern in transientPatterns) {
+      if (errorStrLower.contains(pattern)) return true;
+    }
     return false;
   }
 }
