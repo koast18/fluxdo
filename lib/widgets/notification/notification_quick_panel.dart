@@ -182,22 +182,21 @@ class _SidebarNotificationPanelState extends State<SidebarNotificationPanel>
     final panelHeight = (screenSize.height * 0.9).clamp(0.0, 900.0);
     final actualPanelWidth = panelWidth.clamp(0.0, screenSize.width);
 
-    // 面板可见区域（随动画展开）
+    // 面板可见区域的圆角矩形（排除此区域避免模糊影响面板内容）
     final visiblePanelWidth = actualPanelWidth * _animation.value;
-    final panelRect = Rect.fromLTWH(
-      0,
-      screenSize.height - panelHeight,
-      visiblePanelWidth,
-      panelHeight,
+    final panelRRect = RRect.fromRectAndCorners(
+      Rect.fromLTWH(0, screenSize.height - panelHeight,
+          visiblePanelWidth, panelHeight),
+      topRight: const Radius.circular(20),
     );
 
     return Stack(
       children: [
-        // 模糊层：裁剪掉面板区域，不影响面板
+        // 模糊层：排除面板圆角矩形，圆角外侧仍可透出模糊
         if (blur)
           Positioned.fill(
             child: ClipPath(
-              clipper: _ExcludeRectClipper(panelRect),
+              clipper: _ExcludeRRectClipper(panelRRect),
               child: BackdropFilter(
                 filter: createBlurFilter(
                   (blurSigma * _animation.value).clamp(0.01, blurSigma),
@@ -206,12 +205,13 @@ class _SidebarNotificationPanelState extends State<SidebarNotificationPanel>
               ),
             ),
           ),
-        // 暗色遮罩 + 点击关闭（全屏，面板自身遮盖）
+        // 暗色遮罩 + 点击关闭（全屏，面板自身遮盖其下方区域）
         Positioned.fill(
           child: GestureDetector(
             onTap: NotificationQuickPanel.dismiss,
             child: ColoredBox(
-              color: barrierColor.withValues(alpha: barrierColor.a * _animation.value),
+              color: barrierColor.withValues(
+                  alpha: barrierColor.a * _animation.value),
             ),
           ),
         ),
@@ -241,21 +241,21 @@ class _SidebarNotificationPanelState extends State<SidebarNotificationPanel>
     // 面板可见高度（随动画和拖拽变化）
     final visibleHeight =
         (panelHeight * _animation.value - dragOffset).clamp(0.0, panelHeight);
-    final panelRect = Rect.fromLTWH(
-      0,
-      screenSize.height - visibleHeight,
-      screenSize.width,
-      visibleHeight,
+    final panelRRect = RRect.fromRectAndCorners(
+      Rect.fromLTWH(0, screenSize.height - visibleHeight,
+          screenSize.width, visibleHeight),
+      topLeft: const Radius.circular(20),
+      topRight: const Radius.circular(20),
     );
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // 模糊层：裁剪掉面板区域
+        // 模糊层：排除面板圆角矩形
         if (blur)
           Positioned.fill(
             child: ClipPath(
-              clipper: _ExcludeRectClipper(panelRect),
+              clipper: _ExcludeRRectClipper(panelRRect),
               child: BackdropFilter(
                 filter: createBlurFilter(
                   (blurSigma * _animation.value).clamp(0.01, blurSigma),
@@ -269,7 +269,8 @@ class _SidebarNotificationPanelState extends State<SidebarNotificationPanel>
           child: GestureDetector(
             onTap: NotificationQuickPanel.dismiss,
             child: ColoredBox(
-              color: barrierColor.withValues(alpha: barrierColor.a * _animation.value),
+              color: barrierColor.withValues(
+                  alpha: barrierColor.a * _animation.value),
             ),
           ),
         ),
@@ -289,22 +290,27 @@ class _SidebarNotificationPanelState extends State<SidebarNotificationPanel>
   }
 }
 
-/// 裁剪路径：全屏减去指定矩形区域（EvenOdd 填充规则）
-class _ExcludeRectClipper extends CustomClipper<Path> {
-  final Rect excludeRect;
-  const _ExcludeRectClipper(this.excludeRect);
+/// 裁剪路径：全屏减去指定圆角矩形（EvenOdd 填充规则）
+///
+/// 模糊层使用此 clipper，使模糊覆盖除面板内容区域外的整个屏幕。
+/// 面板圆角外侧（弧线与包围盒之间的三角区）仍在模糊范围内，
+/// 因此圆角处可自然透出模糊背景。
+class _ExcludeRRectClipper extends CustomClipper<Path> {
+  final RRect excludeRRect;
+  const _ExcludeRRectClipper(this.excludeRRect);
 
   @override
   Path getClip(Size size) {
     return Path()
       ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..addRect(excludeRect)
+      ..addRRect(excludeRRect)
       ..fillType = PathFillType.evenOdd;
   }
 
   @override
-  bool shouldReclip(_ExcludeRectClipper old) => excludeRect != old.excludeRect;
+  bool shouldReclip(_ExcludeRRectClipper old) => excludeRRect != old.excludeRRect;
 }
+
 
 /// 手机模式 BottomSheet 面板
 /// 拖拽手柄

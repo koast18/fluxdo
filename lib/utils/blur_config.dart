@@ -29,15 +29,15 @@ final ColorFilter saturationFilter = () {
   ]);
 }();
 
-/// 创建模糊 + 饱和度增强的复合滤镜
+/// 创建模糊滤镜
+///
+/// 不叠加饱和度增强 —— `ColorFilter.matrix` 在低精度像素上运算
+/// 会放大量化噪声，导致模糊画面出现可见噪点。
 ImageFilter createBlurFilter(double sigma) {
-  return ImageFilter.compose(
-    outer: saturationFilter,
-    inner: ImageFilter.blur(
-      sigmaX: sigma,
-      sigmaY: sigma,
-      tileMode: TileMode.mirror,
-    ),
+  return ImageFilter.blur(
+    sigmaX: sigma,
+    sigmaY: sigma,
+    tileMode: TileMode.mirror,
   );
 }
 
