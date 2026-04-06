@@ -535,7 +535,7 @@ jobs:
           sed 's/VERSION/${{ steps.version.outputs.VERSION }}/g' .github/release_template.md >> release_notes.md
 
       - name: Generate SHA256 checksums
-        if: env.IS_STABLE == 'true'
+        # if: env.IS_STABLE == 'true'
         run: |
           cd ./dist
           for file in $(find . -type f -not -name "*.sha256"); do
@@ -543,13 +543,13 @@ jobs:
           done
 
       - name: Create Release
-        if: env.IS_STABLE == 'true'
+        # if: env.IS_STABLE == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: ./dist/*
           body_path: release_notes.md
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref, '-') }}  # Beta 标记为 prerelease
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
