@@ -555,7 +555,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update AltStore Source
-        if: env.IS_STABLE == 'true'
+        # if: env.IS_STABLE == 'true'
         run: |
           VERSION="${GITHUB_REF#refs/tags/v}"
           VERSION_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -605,14 +605,14 @@ jobs:
           fi
 
       - name: Prepare GitHub Pages
-        if: env.IS_STABLE == 'true'
+        # if: env.IS_STABLE == 'true'
         run: |
           mkdir -p gh-pages-deploy
           cp altstore/source.json gh-pages-deploy/
           cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png gh-pages-deploy/icon.png
 
       - name: Deploy to GitHub Pages
-        if: env.IS_STABLE == 'true'
+        # if: env.IS_STABLE == 'true'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
